@@ -23,3 +23,7 @@ Nothing to do. 0.2.1 changes no behaviour; pull the new image and recreate the c
 ## From 0.2.1 to 0.2.2
 
 Nothing to do. 0.2.2 changes no behaviour; pull the new image and recreate the container.
+
+## From 0.2.2 to 0.2.3
+
+Nothing to do. 0.2.3 changes no behaviour; pull the new image and recreate the container.

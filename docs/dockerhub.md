@@ -1,8 +1,7 @@
 # laminator
 
-[![Docker pulls](https://img.shields.io/docker/pulls/cj0r/laminator?style=flat-square)](https://hub.docker.com/r/cj0r/laminator)
-[![Docker image size](https://img.shields.io/docker/image-size/cj0r/laminator/latest?style=flat-square&label=image%20size)](https://hub.docker.com/r/cj0r/laminator)
-[![Tests](https://img.shields.io/github/actions/workflow/status/cj0r/laminator/tests.yml?branch=main&style=flat-square&label=tests)](https://github.com/cj0r/laminator/actions/workflows/tests.yml)
+[![Docker pulls](https://img.shields.io/docker/pulls/cj0r/laminator?style=flat-square&cacheSeconds=86400)](https://hub.docker.com/r/cj0r/laminator)
+[![Tests](https://github.com/cj0r/laminator/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/cj0r/laminator/actions/workflows/tests.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square)](https://github.com/cj0r/laminator/blob/main/LICENSE)
 
 MDBList score badges on your Emby and Jellyfin posters, and metadata overrides on existing items, from a web UI. Everything it changes can be put back. Emby and Jellyfin can be connected at the same time.
@@ -37,7 +36,7 @@ laminator changes posters and metadata on your media server: try it on a few tit
 ## Tags
 
 - `latest`: the newest release.
-- `0`, `0.2`, `0.2.2`: a major, minor or exact release, to update on your own terms.
+- `0`, `0.2`, `0.2.3`: a major, minor or exact release, to update on your own terms.
 
 The same images are on GitHub's registry as `ghcr.io/cj0r/laminator`.
 

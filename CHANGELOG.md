@@ -2,6 +2,13 @@
 
 Versions follow [semantic versioning](https://semver.org). Docker images are tagged `latest` (the newest release), `<version>`, `<major>.<minor>` and `<major>` (for a release tag such as `v0.2.0`), and `dev` (the latest test build from the development repository).
 
+## 0.2.3 (2026-11-05)
+
+A small maintenance release; the application itself is unchanged.
+
+### Fixed
+- The badges at the top of the README and the Docker Hub overview did not always load on GitHub, whose image proxy gives up after a few seconds on a slow badge. The test badge now comes from GitHub itself, the version badge uses the lighter form, the image-size badge is gone, and the others are cached for a day.
+
 ## 0.2.2 (2026-11-05)
 
 A small maintenance release; the application itself is unchanged.
