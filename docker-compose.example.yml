@@ -2,7 +2,7 @@
 # One-off commands:  docker compose run --rm laminator apply --library Movies
 services:
   laminator:
-    image: cj0r/laminator:latest        # the newest release; `:dev` is the latest test build, `:0.2.0` pins an exact release
+    image: cj0r/laminator:latest        # the newest release; `:dev` is the latest test build, `:0.2.1` pins an exact release
     restart: unless-stopped
     ports:
       - "5264:5264"                     # behind a reverse proxy on the same host: "127.0.0.1:5264:5264" so only the proxy can reach it

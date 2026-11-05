@@ -32,7 +32,7 @@ laminator changes posters and metadata on your media server: try it on a few tit
 ## Tags
 
 - `latest`: the newest release.
-- `0`, `0.2`, `0.2.0`: a major, minor or exact release, to update on your own terms.
+- `0`, `0.2`, `0.2.1`: a major, minor or exact release, to update on your own terms.
 
 ## More
 

@@ -15,3 +15,7 @@ What happens on the first start of 0.2.0:
 Posters already on your server keep their badges. The next run updates scores in place, and an apply with nothing changed skips the title.
 
 To go back, restore the backup you made and run the previous image. The conversion of the data folder is not reversed automatically, which is why the backup comes first.
+
+## From 0.2.0 to 0.2.1
+
+Nothing to do. 0.2.1 changes no behaviour; pull the new image and recreate the container.

@@ -18,7 +18,7 @@ body:
     attributes:
       label: laminator version
       description: Shown next to the logo in the web UI.
-      placeholder: v0.2.0
+      placeholder: v0.2.1
     validations:
       required: true
   - type: dropdown

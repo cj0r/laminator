@@ -2,6 +2,16 @@
 
 Versions follow [semantic versioning](https://semver.org). Docker images are tagged `latest` (the newest release), `<version>`, `<major>.<minor>` and `<major>` (for a release tag such as `v0.2.0`), and `dev` (the latest test build from the development repository).
 
+## 0.2.1 (2026-11-05)
+
+A small maintenance release; the application itself is unchanged.
+
+### Added
+- A PNG version of the icon (`docs/logo/icon.png`, 512x512), for Community Applications and other places that do not take SVG.
+
+### Changed
+- The GitHub Actions used to test, build and release the image are pinned to commit SHAs instead of version tags (the version stays in a comment, and Dependabot keeps them current), so a moved or hijacked tag cannot change what runs with the release permissions.
+
 ## 0.2.0 (2026-11-05)
 
 ### Added
