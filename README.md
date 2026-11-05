@@ -1,5 +1,13 @@
 <h1 align="center"><img src="docs/logo/banner.svg" alt="laminator" width="100%"></h1>
 
+<p align="center">
+  <a href="https://hub.docker.com/r/cj0r/laminator"><img src="https://img.shields.io/docker/v/cj0r/laminator?sort=semver&style=flat-square&label=docker" alt="Docker image version"></a>
+  <a href="https://hub.docker.com/r/cj0r/laminator"><img src="https://img.shields.io/docker/pulls/cj0r/laminator?style=flat-square" alt="Docker pulls"></a>
+  <a href="https://hub.docker.com/r/cj0r/laminator"><img src="https://img.shields.io/docker/image-size/cj0r/laminator/latest?style=flat-square&label=image%20size" alt="Docker image size"></a>
+  <a href="https://github.com/cj0r/laminator/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/cj0r/laminator/tests.yml?branch=main&style=flat-square&label=tests" alt="Tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square" alt="License: GPL-3.0"></a>
+</p>
+
 Score badges and metadata overrides for **Emby and Jellyfin**.
 
 laminator draws a rating from MDBList onto your movie and show posters and lets you correct metadata such as content ratings, titles and tags, all from a web UI. Everything it changes can be put back.
@@ -29,6 +37,8 @@ services:
     volumes:
       - ./data:/data
 ```
+
+The image is [`cj0r/laminator` on Docker Hub](https://hub.docker.com/r/cj0r/laminator) (`linux/amd64` and `linux/arm64`; tags `latest`, `0`, `0.2` and exact versions such as `0.2.2`), also on `ghcr.io/cj0r/laminator`.
 
 Run `docker compose up -d`, open `http://<host>:5264`, and choose your password (the setup code is in `docker logs laminator`). Then add your server and MDBList key in **Settings**. Unraid and other setups are in [Getting started](docs/getting-started.md).
 

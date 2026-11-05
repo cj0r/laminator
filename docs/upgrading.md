@@ -19,3 +19,7 @@ To go back, restore the backup you made and run the previous image. The conversi
 ## From 0.2.0 to 0.2.1
 
 Nothing to do. 0.2.1 changes no behaviour; pull the new image and recreate the container.
+
+## From 0.2.1 to 0.2.2
+
+Nothing to do. 0.2.2 changes no behaviour; pull the new image and recreate the container.

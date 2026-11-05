@@ -2,6 +2,14 @@
 
 Versions follow [semantic versioning](https://semver.org). Docker images are tagged `latest` (the newest release), `<version>`, `<major>.<minor>` and `<major>` (for a release tag such as `v0.2.0`), and `dev` (the latest test build from the development repository).
 
+## 0.2.2 (2026-11-05)
+
+A small maintenance release; the application itself is unchanged.
+
+### Changed
+- The README and the Docker Hub overview show the image's Docker Hub version, pull count and size, the test status and the license, and the quick start names the registries (Docker Hub and `ghcr.io`) and the tags.
+- The release build uses `docker/setup-buildx-action` 4.4.1 (still pinned to a commit).
+
 ## 0.2.1 (2026-11-05)
 
 A small maintenance release; the application itself is unchanged.
