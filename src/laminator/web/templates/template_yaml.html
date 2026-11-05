@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}Edit template YAML - laminator{% endblock %}
+{% block body %}
+<p><a href="/templates?name={{ name | urlencode }}&s={{ srv }}">&larr; Templates</a></p>
+<div class="hrow">
+  <h1>Edit template YAML</h1>
+  {% call info("i-tplyaml") %}<dl class="opts">
+    <dt>What this is</dt><dd>The template as plain text, for settings the sliders do not cover or for pasting one you have written elsewhere. It starts from what the Templates page showed when you opened it.</dd>
+    <dt>Checked before it is used</dt><dd><strong>Check</strong> reads the text, verifies every setting and its range, confirms the font exists and draws a test poster with it. <strong>Save</strong> does the same check first, and writes the file only if it passes, exactly as you typed it, comments included.</dd>
+    <dt>Settings</dt><dd><code>sources</code> (score providers, first available wins), <code>decimals</code> (1 = 7.3, 0 = 73), <code>gradient</code> (<code>height</code>, <code>max_opacity</code>, <code>color</code>) and <code>score</code> (<code>font</code>, <code>size</code>, <code>color</code>, <code>margin_x</code>, <code>margin_y</code>, <code>embolden</code>, <code>shadow</code>). Sizes are fractions of the poster, so the look is the same on any resolution. Fonts available: {{ fonts | join(", ") }}.</dd></dl>{% endcall %}
+</div>
+{% if errors %}<div class="note bad"><strong>Not saved. Fix this first:</strong><ul class="plain">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+{% if ok %}<p class="note ok">This template is valid and draws correctly.</p>{% endif %}
+<form method="post" action="/templates/yaml" class="editform" autocomplete="off">
+  <input type="hidden" name="token" value="{{ csrf(request) }}"><input type="hidden" name="s" value="{{ srv }}">
+  <input type="hidden" name="name" value="{{ name }}"><input type="hidden" name="item" value="{{ item }}">
+  <textarea name="text" rows="24" spellcheck="false" wrap="off" aria-label="Template YAML">{{ text }}</textarea>
+  <div class="savebox">
+    <label>Save as a new template <span class="muted">(optional)</span> <input name="new_name" maxlength="40" placeholder="Leave empty to update {{ name|tname }}" value="{{ new_name }}"></label>
+    <div class="actions"><button class="btn plain" name="action" value="check">Check</button><button class="btn" name="action" value="save">Check and save</button><a class="btn plain" href="/templates?name={{ name | urlencode }}&s={{ srv }}">Cancel</a></div>
+  </div>
+</form>
+{% if preview %}<h2>Test drawing</h2><img class="preview testdrawing" src="{{ preview }}" alt="the template drawn on a poster">{% endif %}
+{% endblock %}

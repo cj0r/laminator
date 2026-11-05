@@ -1,0 +1,4 @@
+{# A clickable (i): the explanation is hidden until it is clicked. CSS only (a checkbox), so it works under the strict CSP.
+   Use inside a flex-wrap ".hrow" or ".row":  {% call info("unique-id") %}text{% endcall %}
+   With a group name, {% call info("unique-id", "group") %}, icons that share the group open one at a time (a second click closes it).  #}
+{% macro info(id, group="") %}<input type="{{ 'radio' if group else 'checkbox' }}"{% if group %} name="{{ group }}"{% endif %} id="{{ id }}" class="infotoggle"><label for="{{ id }}" class="infoicon" title="More information" aria-label="More information">i</label><div class="infobody">{{ caller() }}</div>{% endmacro %}

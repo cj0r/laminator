@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}Library - laminator{% endblock %}
+{% block body %}
+{% if first_run and total %}<section class="note warn firststeps"><strong>Nothing has been applied yet, and nothing runs on its own.</strong>
+  <ol><li>Open any title and press <strong>Apply</strong> to see the result on one poster.</li>
+  <li>When you like it, use <strong>Apply to this library&hellip;</strong> (it asks first and shows how many titles).</li>
+  <li>Only then, if you want it, turn on automatic checks under <a href="/settings#critic">Settings, Options</a>.</li></ol></section>{% endif %}
+<div class="bar">
+  <form class="filters" hx-get="/library" hx-target="#grid" hx-trigger="input delay:300ms, change" hx-sync="this:replace" hx-push-url="true">
+    <input type="hidden" name="s" value="{{ srv }}">
+    <select name="lib">
+      {% for l in libs %}<option value="{{ l }}" {{ "selected" if l == lib }}>{{ l }}</option>{% endfor %}
+    </select>
+    <input type="search" name="q" value="{{ q }}" placeholder="Search title">
+    <select name="show" aria-label="Filter the titles" class="showfilter">
+      <option value="">Filter: everything</option>
+      {% for group, opts in show_groups %}<optgroup label="{{ group }}">{% for v, label in opts %}<option value="{{ v }}" {{ "selected" if v == show }}>{{ label }}</option>{% endfor %}</optgroup>{% endfor %}
+    </select>
+    <span id="resetslot">{% include "_reset.html" %}</span>
+    <details class="morefilters" {{ "open" if more_open }}>
+      <summary>Score, year and content rating</summary>
+      <div class="morebox">
+        <label>Score source <select name="ssrc">{% for i, label in score_sources %}<option value="{{ i }}" {{ "selected" if i == f.ssrc }}>{{ label }}</option>{% endfor %}</select></label>
+        <label>Score from <input type="number" name="smin" min="0" max="10" step="0.1" inputmode="decimal" value="{{ '' if f.smin is none else '%g' % f.smin }}" placeholder="0"></label>
+        <label>to <input type="number" name="smax" min="0" max="10" step="0.1" inputmode="decimal" value="{{ '' if f.smax is none else '%g' % f.smax }}" placeholder="10"></label>
+        <label>Year from <input type="number" name="ymin" min="1870" max="2100" step="1" inputmode="numeric" value="{{ '' if f.ymin is none else '%d' % f.ymin }}" placeholder="any"></label>
+        <label>to <input type="number" name="ymax" min="1870" max="2100" step="1" inputmode="numeric" value="{{ '' if f.ymax is none else '%d' % f.ymax }}" placeholder="any"></label>
+        <label>Content rating <select name="crate"><option value="">Any</option>{% for r, label, n in rating_options %}<option value="{{ r }}" {{ "selected" if r == f.crate }}>{{ label }} ({{ n }})</option>{% endfor %}</select></label>
+      </div>
+    </details>
+    <div class="viewtoggle" role="radiogroup" aria-label="View">
+      {% for v, label in views %}<label><input type="radio" name="view" value="{{ v }}" {{ "checked" if v == view }}><span>{{ label }}</span></label>{% endfor %}
+    </div>
+    <select name="per" aria-label="Titles per page">
+      {% for v, label in pers %}<option value="{{ v }}" {{ "selected" if v == per }}>{{ label }}</option>{% endfor %}
+    </select>
+  </form>
+  <a class="btn plain" href="/assets?s={{ srv }}">Custom posters</a>
+  {% if selectable %}<a class="btn" href="/confirm?action=apply&scope=selection&changed=0&{{ base }}">Apply to these {{ total }} title{{ "" if total == 1 else "s" }}&hellip;</a>{% endif %}
+  {% if selectable %}<a class="btn plain" href="/confirm?action=restore&scope=selection&what=scores&{{ base }}" title="Put the original posters back for exactly these titles">Restore these {{ total }}&hellip;</a>{% endif %}
+  {% if can_write and lib %}<a class="btn {{ 'plain' if selectable }}" href="/confirm?action=apply&scope=library&lib={{ lib | urlencode }}&s={{ srv }}">Apply to this library&hellip;</a>{% endif %}
+</div>
+<div class="hrow legend"><span class="muted">What the filter finds</span>{% call info("i-filter") %}<dl class="opts">
+  <dt>No MDBList score</dt><dd>Titles MDBList gave no score (or a score of 0), titles with no IMDb, TMDb or TVDB id (fan edits), and titles that have not been looked up yet. It reads what laminator saved from earlier runs and never asks MDBList.</dd>
+  <dt>Manual score override</dt><dd>Titles with a <code>score:</code> entry in overrides.yaml.</dd>
+  <dt>Score, year and content rating</dt><dd>Narrow the list further. The score range uses the chosen source: the MDBList combined score (a manual override counts as the score), or one provider's score, from earlier lookups. Titles without a score for that source are left out. Scores are on a scale of 0 to 10. The content rating list shows the ratings present in this library.
+  <dt>Poster filters</dt><dd>Match the label on each title: not managed, overlay applied, original poster, changed on server. The rest find titles with a custom poster, or no poster in the server at all.</dd>
+  <dt>Metadata</dt><dd><em>Overridden</em>: values from overrides.yaml were written to the title. <em>Listed</em>: overrides.yaml has an entry for it, applied or not.</dd></dl>{% endcall %}
+  <span class="muted legend2">What the labels on each title mean</span>{% call info("i-legend") %}<dl class="opts">
+  <dt><span class="badge plain">not managed</span></dt><dd>laminator has not changed this title's poster yet.</dd>
+  <dt><span class="badge ok">overlay 7.7</span></dt><dd>The score (here 7.7) is drawn on the poster in the server.</dd>
+  <dt><span class="badge orig">original poster</span></dt><dd>laminator has saved the original, and the plain original (no score) is what the server shows now, for example after a restore.</dd>
+  <dt><span class="badge warn">changed on server</span></dt><dd>The poster in the server changed since laminator last wrote it (you picked another one, or a refresh replaced it). The next apply deals with it.</dd>
+  <dt><span class="badge changed">metadata</span></dt><dd>Values from your overrides.yaml (content rating, sort title and so on) were written to this title and locked.</dd></dl>{% endcall %}</div>
+<div id="grid">{% include "_grid.html" %}</div>
+{% endblock %}

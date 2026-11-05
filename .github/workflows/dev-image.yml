@@ -1,0 +1,76 @@
+name: Dev image
+
+# A test image for trying changes on your own server before they're released.
+# Every push to main here builds cj0r/laminator:dev (and :dev-<commit>) for amd64 and arm64.
+# "Run workflow" on the Actions tab builds it from any branch, to try a change before merging.
+# The web UI shows which build it is: v0.2.0-dev+a1b2c3d.
+#
+# Needs the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN secrets (the same ones the public repo uses).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-image
+  cancel-in-progress: true
+
+env:
+  IMAGE: cj0r/laminator
+
+jobs:
+  image:
+    if: github.repository == 'cj0r/laminator-dev'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Tests
+        run: |
+          pip install -r requirements.txt -e '.[dev]'
+          pytest -q
+      - name: Short commit
+        id: c
+        run: echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build the amd64 image to test
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: laminator:test
+          build-args: BUILD=${{ steps.c.outputs.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test it before anything is pushed
+        run: |
+          docker run -d --name lam -p 5264:5264 laminator:test
+          for i in $(seq 30); do curl -fs http://127.0.0.1:5264/healthz && exit 0; sleep 2; done
+          docker logs lam; exit 1
+      - name: Build amd64 + arm64 and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:dev
+            ${{ env.IMAGE }}:dev-${{ steps.c.outputs.sha }}
+          build-args: |
+            VERSION=dev-${{ steps.c.outputs.sha }}
+            REVISION=${{ github.sha }}
+            BUILD=${{ steps.c.outputs.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - run: echo "Pushed ${IMAGE}:dev and ${IMAGE}:dev-${{ steps.c.outputs.sha }}" >> "$GITHUB_STEP_SUMMARY"

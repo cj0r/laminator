@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}Templates - laminator{% endblock %}
+{% block body %}
+<div class="hrow">
+  <h1>Templates</h1>
+  {% call info("i-tpl") %}Try the look on a real poster, then give it a name and save it. Saved templates appear in the Template list here and can be used for scheduled runs (Settings) or with <code>--template NAME</code>. Nothing is saved until you press Save.{% endcall %}
+</div>
+{% if note_text %}<p class="note {{ note_kind or 'ok' }}">{{ note_text }}</p>{% endif %}
+<div class="editor">
+  <form id="ctl" method="post" action="/templates/save" autocomplete="off" hx-get="/templates/panel" hx-target="#panel" hx-trigger="input changed delay:150ms, change" hx-params="not token,new_name">
+    <input type="hidden" name="s" value="{{ srv }}">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <div class="field">
+      <label for="tpl-name">Template</label>
+      <select name="name" id="tpl-name" data-goto="/templates?s={{ srv }}&name=">{% for n in names %}<option value="{{ n }}" {{ "selected" if n == name }}>{{ n|tname }}</option>{% endfor %}</select>
+    </div>
+    <div class="field">
+      <div class="fieldhead"><label for="tpl-source">Score source</label>{% call info("i-tpl-src") %}<dl class="opts">
+        <dt>MDBList combined score</dt><dd>The default: MDBList's own average of all the providers it knows, on a 0-10 scale.</dd>
+        <dt>A single provider</dt><dd>Show that provider's score instead (IMDb, TMDb, Trakt, Letterboxd, Rotten Tomatoes, Metacritic, Roger Ebert). Films that provider has no score for fall back to the combined score, so no poster is left without one.</dd></dl>{% endcall %}</div>
+      <select name="source" id="tpl-source">{% for s in sources %}<option value="{{ s.id }}" {{ "selected" if s.id == source }}>{{ s.label }}</option>{% endfor %}</select>
+    </div>
+    <label>Poster <select name="item">{% for i in items %}<option value="{{ i.id }}" {{ "selected" if it and i.id == it.id }}>{{ i.name }}</option>{% endfor %}</select></label>
+    <label>Score text (blank = real score) <input name="score" maxlength="8" placeholder="e.g. 8.5" value="{{ score_text }}"></label>
+    <label>Font <select name="font">{% for f in fonts %}<option {{ "selected" if f == font_name }}>{{ f }}</option>{% endfor %}</select></label>
+    <label>Fade height <input type="range" name="gh" min="0.02" max="0.4" step="0.01" value="{{ t.gradient.height }}"></label>
+    <label>Fade opacity <input type="range" name="mo" min="0" max="1" step="0.05" value="{{ t.gradient.max_opacity }}"></label>
+    <label>Score size <input type="range" name="sz" min="0.02" max="0.12" step="0.002" value="{{ t.score.size }}"></label>
+    <label>Right margin <input type="range" name="mx" min="0" max="0.15" step="0.005" value="{{ t.score.margin_x }}"></label>
+    <label>Bottom margin <input type="range" name="my" min="0" max="0.15" step="0.005" value="{{ t.score.margin_y }}"></label>
+    <label>Embolden <input type="range" name="em" min="0" max="0.06" step="0.005" value="{{ t.score.get('embolden', 0) }}"></label>
+    {% if can_write %}
+    <div class="savebox">
+      <label>Save as a new template <span class="muted">(optional)</span> <input name="new_name" maxlength="40" placeholder="Leave empty to update {{ name|tname }}" value="{{ new_name }}"></label>
+      <div class="row"><button class="btn">Save template</button>
+        {% if is_custom %}<button class="btn danger small" formaction="/templates/delete" formnovalidate>{{ "Reset to built-in" if name == "default" else "Delete " ~ (name|tname) }}</button>{% endif %}</div>
+    </div>
+    {% endif %}
+  </form>
+  <div id="panel" hx-get="/templates/panel" hx-trigger="load" hx-include="#ctl" hx-params="not token,new_name"></div>
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Confirm - laminator{% endblock %}
+{% block body %}
+<div class="confirm">
+  <h1>{{ title }}</h1>
+  <p>{{ what }}</p>
+  <p class="muted">{{ keeps }}</p>
+  <form method="post" action="/settings/reset">
+    <input type="hidden" name="token" value="{{ csrf(request) }}"><input type="hidden" name="section" value="{{ section }}">
+    <div class="actions"><button class="btn danger">{{ yes }}</button><a class="btn plain" href="/settings">Cancel</a></div>
+  </form>
+</div>
+{% endblock %}

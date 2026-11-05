@@ -1,0 +1,50 @@
+# secrets and local state
+.env
+config.local.*
+*.key
+
+# generated artwork and caches
+out/
+originals/
+cache/
+
+# python
+__pycache__/
+.venv/
+*.pyc
+*.egg-info/
+state.db
+state.db-*
+overrides.yaml
+data-*/
+
+# runtime files written next to the app (never commit: session signing key, saved keys, password hash, per-server state)
+.secret
+.secret.tmp
+.lock
+schedule.json
+settings.yaml
+secrets.env
+admin.hash
+*.tmp
+servers/
+
+# backups and restore leftovers (hold your state; keep them out of git)
+backups/
+pre-restore-*/
+restored-config.local.yaml
+overrides.yaml.prev
+overrides.yaml.tmp
+exports/
+trash/
+/templates/
+/assets/
+.tmp/
+
+# build output
+build/
+dist/
+
+# runtime files from running the app from the repo folder
+audit.log
+sessions.json

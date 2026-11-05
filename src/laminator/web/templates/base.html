@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "allowScriptTags": false}'>
+  <title>{% block title %}laminator{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v={{ asset_v }}">
+  <meta name="theme-color" content="#0b0714">
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_v }}">
+  <script src="/static/htmx.min.js"></script>
+  <script src="/static/app.js?v={{ asset_v }}" defer></script>
+</head>
+<body>
+<header>
+  <a class="brand" href="/library"><img src="/static/logo.svg?v={{ asset_v }}" alt=""><span class="wordmark">LAMINATOR</span></a>
+  <span class="ver">v{{ app_version }}</span>
+  {% set p = request.url.path %}
+  {% set section = 'Library' if p.startswith(('/library','/item','/posters','/history')) else 'Templates' if p.startswith('/templates') else 'Metadata' if p.startswith('/metadata') else 'Export' if p.startswith('/export') else 'Runs' if p.startswith('/jobs') else 'Status' if p.startswith(('/status','/cleanup','/trash')) else 'Settings' if p.startswith(('/settings','/backups')) else 'Menu' %}
+  <input type="checkbox" id="menu-toggle" class="menutoggle" aria-label="Open the menu">
+  <label for="menu-toggle" class="menubtn"><span class="bars" aria-hidden="true"></span><span class="here">{{ section }}</span></label>
+  <nav class="mainnav" id="mainnav">
+    <a href="/library" class="{{ 'active' if p.startswith(('/library','/item','/posters','/history')) }}">Library</a>
+    <a href="/templates" class="{{ 'active' if p.startswith('/templates') }}">Templates</a>
+    <a href="/metadata?s={{ srv }}" class="{{ 'active' if p.startswith('/metadata') }}">Metadata</a>
+    <a href="/export?s={{ srv }}" class="{{ 'active' if p.startswith('/export') }}">Export</a>
+    <a href="/jobs" class="{{ 'active' if p.startswith('/jobs') }}">Runs</a>
+    <a href="/status" class="{{ 'active' if p.startswith(('/status','/cleanup','/trash')) }}">Status</a>
+    <a href="/settings" class="{{ 'active' if p.startswith(('/settings','/backups')) }}">Settings</a>
+  </nav>
+  {% if nav_servers %}<span class="srvnav">{% for s, label, active in nav_servers %}<a class="srv {{ 'active' if active }}" href="/switch?s={{ s }}&next=/library">{{ label }}</a>{% endfor %}</span>{% endif %}
+  <span class="spacer"></span>
+  {% if not can_write %}<span class="badge plain">read-only</span>{% endif %}
+  <form method="post" action="/logout" class="logout"><input type="hidden" name="token" value="{{ csrf(request) }}"><button class="link">Log out</button></form>
+</header>
+<main>{% if mdb_missing %}<p class="note bad">The MDBList API key is not set, so no scores can be drawn yet. <a href="/settings">Add it in Settings</a> before applying anything.</p>{% endif %}{% block body %}{% endblock %}</main>
+<footer class="foot">
+  <div class="foot-tag">Shield the surface. Elevate the finish.</div>
+  <div class="foot-ver" title="The version of laminator you are running">laminator v{{ app_version }}</div>
+  <div class="foot-row">
+    <div class="foot-support">
+      <span class="foot-support-label">Support development</span>
+      <a class="support-link bmac" href="https://www.buymeacoffee.com/cj0r" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></svg>
+        <span>Buy Me A Coffee</span>
+      </a>
+      <a class="support-link kofi" href="https://ko-fi.com/cj000r" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+        <span>Ko-fi</span>
+      </a>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

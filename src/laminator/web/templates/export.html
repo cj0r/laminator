@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}Export posters - laminator{% endblock %}
+{% block body %}
+<div class="hrow">
+  <h1>Export posters{% if srv_label %} <span class="muted">from {{ srv_label }}</span>{% endif %}</h1>
+  {% call info("i-export") %}Makes a zip of poster images laid out so that, extracted in the right folder, each one lands <strong>next to the media file it belongs to</strong>
+(for example <code>movies/movie-a/poster.jpg</code> beside <code>movies/movie-a/movie.a.1080p.mkv</code>). Several films in one folder get
+<code>&lt;film file&gt;-poster.jpg</code> so nothing overwrites anything. The paths are those the media server sees; the zip's README explains where to extract it.
+Nothing on your media server or your disks is changed.{% endcall %}
+</div>
+{% if note_text %}<p class="note {{ note_kind }}">{{ note_text }}{% if note_detail %} {{ note_detail }}{% endif %}</p>{% endif %}
+{% if can_write %}
+<section class="card2">
+  <form method="post" action="/export/create" class="optform">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <input type="hidden" name="srv" value="{{ srv }}">
+    <div class="field">
+      <div class="fieldhead"><label for="ex-which">Which posters</label>{% call info("i-ex-which", "exf") %}<dl class="opts">
+        <dt>As on {{ srv_label }} now</dt><dd>The posters exactly as your media server shows them today, including the score overlay.</dd>
+        <dt>Originals</dt><dd>The untouched original posters laminator saved, without any score.</dd></dl>{% endcall %}</div>
+      <select name="which" id="ex-which">
+        <option value="current">As on {{ srv_label }} now (with scores)</option>
+        <option value="original">Originals (no scores)</option>
+      </select></div>
+    <div class="field"><label for="ex-lib">Library</label>
+      <select name="library" id="ex-lib"><option value="">All libraries</option>{% for l in libraries %}<option>{{ l }}</option>{% endfor %}</select></div>
+    <div class="field">
+      <div class="fieldhead"><label for="ex-layout">Top folder in the zip</label>{% call info("i-ex-layout", "exf") %}<dl class="opts">
+        <dt>Library folder name</dt><dd>Uses the name of the library's folder on disk (for example <code>movies</code>). Extract the zip in the folder that holds your library folders.</dd>
+        <dt>Library name in {{ srv_label }}</dt><dd>Uses the library's display name from {{ srv_label }} as the top folder instead.</dd>
+        <dt>None</dt><dd>No top folder. Extract the zip inside each library folder.</dd></dl>{% endcall %}</div>
+      <select name="layout" id="ex-layout">
+        <option value="location">Library folder name</option>
+        <option value="library">Library name in {{ srv_label }}</option>
+        <option value="none">None</option>
+      </select></div>
+    <div class="field">
+      <div class="fieldhead"><label for="ex-naming">File names</label>{% call info("i-ex-naming", "exf") %}<dl class="opts">
+        <dt>Automatic</dt><dd><code>poster.jpg</code> when a film has its own folder, and <code>&lt;file&gt;-poster.jpg</code> when several films share one folder, so nothing collides.</dd>
+        <dt>Always poster.jpg</dt><dd>Every poster is named <code>poster.jpg</code>. Only safe when each film has its own folder.</dd>
+        <dt>Always &lt;file&gt;-poster.jpg</dt><dd>Each poster is named after its media file, for example <code>Movie.2020.1080p-poster.jpg</code>.</dd></dl>{% endcall %}</div>
+      <select name="naming" id="ex-naming">
+        <option value="auto">Automatic</option>
+        <option value="poster">Always poster.jpg</option>
+        <option value="stem">Always &lt;file&gt;-poster.jpg</option>
+      </select></div>
+    <div class="row"><button class="btn">Create the package</button></div>
+  </form>
+</section>
+{% endif %}
+<h2>Packages</h2>
+<table>
+  <tr><th>File</th><th>Made</th><th>Size</th><th></th></tr>
+  {% for e in exports %}<tr><td>{{ e.name }}</td><td>{{ e.when }}</td><td>{{ e.mb }} MB</td><td><a href="/exports/download/{{ e.name | urlencode }}">Download</a></td></tr>
+  {% else %}<tr><td colspan="4" class="muted">No packages yet.</td></tr>{% endfor %}
+</table>
+<p class="muted">Packages are made on request and removed by maintenance after 14 days; make a new one any time.</p>
+{% endblock %}

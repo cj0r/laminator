@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}Trash - laminator{% endblock %}
+{% block body %}
+<p><a href="/cleanup?s={{ srv }}">&larr; Clean up</a></p>
+<div class="hrow">
+  <h1>Trash{% if srv_label %} <span class="muted">{{ srv_label }}</span>{% endif %}</h1>
+  {% call info("i-trash") %}What clean-up moved out of the way: saved posters and records of films that stayed missing from the server, and files nothing referred to. Each batch is deleted for good
+{{ trash_days }} days after it was made. Restoring puts the posters and records back; <strong>nothing is overwritten</strong> (an item that has records again, or a file that exists,
+is left as it is). A restored film that is still gone from the server gets a fresh grace period before it can be cleaned up again.{% endcall %}
+</div>
+{% for b in batches %}
+<section class="card2">
+  <h3>{{ b.stamp }} <span class="muted">{{ "shared" if b.scope == "root" else "this server" }} &middot; {{ b.mb }} MB &middot; kept {{ b.left }} more day(s)</span></h3>
+  {% if b.entries %}<table class="stack"><tr><th>Item</th><th>Missing since</th><th>Saved posters</th><th></th></tr>
+    {% for i in b.entries %}<tr><td>{{ i.name }}</td><td>{{ i.since }}</td><td>{{ i.files }}</td>
+      <td>{% if can_write %}<form method="post" action="/trash/restore" class="inline"><input type="hidden" name="token" value="{{ csrf(request) }}"><input type="hidden" name="srv" value="{{ srv }}"><input type="hidden" name="stamp" value="{{ b.stamp }}"><input type="hidden" name="item" value="{{ i.id }}"><button class="btn plain">Restore</button></form>{% endif %}</td></tr>{% endfor %}</table>{% endif %}
+  {% if b.orphans %}<p class="muted">{{ b.orphans }} saved poster file(s) that no record referred to.</p>{% endif %}
+  {% if b.safety %}<p class="muted">Safety copies: {{ b.safety | join(", ") }}</p>{% endif %}
+  {% if can_write %}<form method="post" action="/trash/restore">
+    <input type="hidden" name="token" value="{{ csrf(request) }}"><input type="hidden" name="srv" value="{{ srv }}"><input type="hidden" name="stamp" value="{{ b.stamp }}"><input type="hidden" name="everything" value="1">
+    <button class="btn">Restore everything in this batch</button></form>{% endif %}
+</section>
+{% else %}<p class="muted">The trash is empty.</p>{% endfor %}
+{% endblock %}

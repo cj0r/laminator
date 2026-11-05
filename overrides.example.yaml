@@ -1,0 +1,28 @@
+# Copy to overrides.yaml (gitignored, your data). Edit, then:
+#   laminator meta diff       # shows "field: old -> new", writes nothing
+#   laminator meta apply      # writes the values AND locks exactly those fields
+#   laminator restore --what meta --all
+#
+# match: imdb / tmdb / tvdb (survives rescans and renames), or library + title (+ year).
+# written to the server (backed up, locked, read back; restorable):
+#   rating, title, sort_title, original_title, overview, tagline (Emby cannot lock taglines), critic_rating (0-100),
+#   tags / genres / studios (a list replaces everything; {add: [...], remove: [...]} changes only those names; [] clears)
+# poster only (never changes the server's metadata):
+#   score (0-10 or short text), template (one of your templates), source (imdb, tmdb, ...), overlay: false (no score on this title)
+overrides:
+  - match: {imdb: tt0319343}        # Elf
+    rating: PG-13                   # must be a rating name Emby knows (G, PG, PG-13, R, TV-MA, ...)
+    sort_title: "Elf (2003)"
+  - match: {library: Movies, title: Dumbo, year: 1941}
+    original_title: "Dumbo: The Flying Elephant"
+  - match: {imdb: tt0107290}       # Jurassic Park: my own score instead of MDBList's
+    score: 9.5                     # number 0-10 (shown like the template's decimals), or short text like "A+"
+  - match: {imdb: tt0319343}        # only on Jellyfin: `server:` limits an entry to one server (default: wherever it matches)
+    rating: PG
+    server: jellyfin
+  - match: {imdb: tt0107290}       # a fan edit: its own title, tags, a critic rating of my own, and no score drawn
+    title: "Jurassic Park (Fan Edit)"
+    tags: [Fan Edit]
+    genres: {add: [Adventure]}
+    critic_rating: 80
+    overlay: false

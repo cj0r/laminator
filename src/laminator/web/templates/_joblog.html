@@ -1,0 +1,17 @@
+<div id="log"{% if status in ("running", "queued") %} hx-get="/jobs/{{ job.id }}/log" hx-trigger="every 1s" hx-swap="outerHTML"{% endif %}>
+  <p>
+    {% if status == "queued" %}<span class="badge plain">waiting</span>
+    {% elif status == "cancelled" %}<span class="badge plain">cancelled</span>
+    {% elif status == "running" %}<span class="badge warn">running</span>
+    {% elif status == "failed" %}<span class="badge bad">finished with problems</span>
+    {% else %}<span class="badge ok">done</span>{% endif %}
+    <span class="muted">{{ events | length }} line{{ "" if events | length == 1 else "s" }}</span>
+  </p>
+  {% if status == "queued" %}<div class="note warn queuenote">This is queued behind <strong>{{ ahead or "another run" }}</strong>{% if position > 1 %} and {{ position - 1 }} other{{ "" if position == 2 else "s" }}{% endif %}.
+    {% if job.priority %}It is a small change, so it runs in the next gap of that run, which then carries on.{% else %}It starts by itself when that run is finished: you can leave this page.{% endif %}
+    {% if can_cancel %}<form method="post" action="/jobs/{{ job.id }}/cancel" class="inline"><input type="hidden" name="token" value="{{ csrf(request) }}"><button class="btn plain small">Cancel it</button></form>{% endif %}</div>{% endif %}
+  <pre class="log">{% for e in events %}<span class="ev-{{ e.kind }}">{{ e.line() }}</span>
+{% else %}{% if status == "queued" %}waiting to start{% elif status == "running" %}starting&hellip;{% elif status == "cancelled" %}cancelled before it started{% else %}nothing to do{% endif %}
+{% endfor %}{% if error %}<span class="ev-error">{{ error }}</span>
+{% endif %}</pre>
+</div>

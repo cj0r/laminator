@@ -1,0 +1,6 @@
+{% from "_ui.html" import info %}
+{% if it %}<img class="preview" src="/img/{{ it.id }}/preview?{{ qs }}" alt="preview">{% else %}<p class="muted preview">No poster to preview.</p>{% endif %}
+<div class="yamlbox"><h2>YAML</h2>
+{% if can_write %}<div class="actions"><div class="fieldhead act"><a class="btn plain" href="/templates/yaml?{{ qs }}">Edit YAML&hellip;</a>
+  {% call info("i-act-yaml", "act") %}<dl class="opts"><dt>What it does</dt><dd>Opens this template as plain text so you can change settings the sliders do not cover, or paste one you wrote elsewhere. <strong>Check</strong> verifies every setting and draws a test poster; <strong>Check and save</strong> writes the file only if it passes. It starts from what the sliders show right now.</dd></dl>{% endcall %}</div></div>{% endif %}
+<pre>{{ yaml }}</pre></div>

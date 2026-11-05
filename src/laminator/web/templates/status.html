@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}Status - laminator{% endblock %}
+{% macro keystatus(k) %}{% if k.source == "missing" %}<span class="badge warn">not set</span> <a href="/settings">Set it in Settings</a>
+{% else %}<span class="badge ok">set</span> <code>{{ k.masked }}</code> <span class="muted">{{ "saved in Settings" if k.source == "settings" else "from .env / the environment" }}</span> <a href="/settings">change</a>{% endif %}{% endmacro %}
+{% block body %}
+<h1>Status</h1>
+<p class="muted">laminator <strong>v{{ app_version }}</strong></p>
+{% for r in rows %}
+<h2>{{ r.label }}</h2>
+<table>
+  <tr><th>Address</th><td>{{ r.url }}</td></tr>
+  <tr><th>Connection</th><td><span class="badge {{ r.state[0] }}">{{ r.state[1] }}</span></td></tr>
+  <tr><th>Libraries</th><td>{% for n, c in r.libraries.items() %}{{ n }} ({{ c }}){{ ", " if not loop.last }}{% else %}none{% endfor %}</td></tr>
+  <tr><th>API key</th><td>{{ keystatus(r.key) }}</td></tr>
+  <tr><th>Items we manage</th><td>{{ r.posters }} posters, {{ r.metas }} metadata fields</td></tr>
+  <tr><th>Clean up</th><td><a href="/cleanup?s={{ srv }}">See what could be cleaned up</a></td></tr>
+  <tr><th>Saved originals</th><td>{{ r.originals }} files, {{ r.orig_mb }} MB - <strong>back these up with state.db</strong></td></tr>
+</table>
+{% else %}<p class="muted">No media server is set up yet. <a href="/settings">Add one in Settings.</a></p>{% endfor %}
+
+<h2>General</h2>
+<table>
+  <tr><th>MDBList API key</th><td>{{ keystatus(mdb_key) }}</td></tr>
+  <tr><th>MDBList requests left today</th><td>{{ mdb_left if mdb_left is not none else "unknown until the first lookup" }}</td></tr>
+  {% if sched %}
+  <tr><th>Schedule</th><td>
+    {% if sched.active %}<span class="badge ok">running</span>{% else %}<span class="badge warn">not running</span>{% endif %}
+    check for new or changed posters: {{ sched.changed }}<br>
+    full maintenance: {{ sched.maintenance }}{% if sched.next %} - next {{ sched.next }}{% endif %}<br>
+    {% for run in sched.runs %}{{ run.label }}: {% if run.scheduled %}last check {{ run.last_changed }}, last full pass {{ run.last_full }}{% else %}not included in scheduled runs{% endif %}<br>{% endfor %}
+    backup: {{ sched.backup }} (last {{ sched.last_backup }})<br>
+    {% if sched.destination %}copied to: {{ sched.destination }}{% if sched.dest_error %} <strong>- last copy failed: {{ sched.dest_error }}</strong>{% endif %}<br>{% endif %}
+    template: {{ sched.template }}{% if sched.error %}<br><span class="badge bad">{{ sched.error }}</span>{% endif %}
+  </td></tr>
+  {% else %}<tr><th>Schedule</th><td class="muted">off</td></tr>{% endif %}
+  <tr><th>Write score to CriticRating</th><td>{{ "on" if critic else "off" }} &middot; <a href="/settings#critic">change in Settings</a></td></tr>
+  <tr><th>Data folder</th><td><code>{{ data }}</code></td></tr>
+  <tr><th>Templates</th><td>{{ templates | join(", ") }}</td></tr>
+  <tr><th>Fonts</th><td>{{ fonts | join(", ") }}</td></tr>
+</table>
+
+<div class="hrow"><h2>Security</h2>{% call info("i-sec-status") %}How this interface is protected right now. Two-factor sign-in and the reverse proxy settings are explained in the user guide's Security page.{% endcall %}</div>
+<table>
+  <tr><th>Two-factor sign-in</th><td>{% if security.mfa %}<span class="badge ok">on</span> <span class="muted">{{ security.mfa_left }} recovery codes left</span>{% else %}<span class="badge warn">off</span> <a href="/settings#security">turn it on</a>{% endif %}</td></tr>
+  <tr><th>Signed-in sessions</th><td>{{ security.sessions }}</td></tr>
+  <tr><th>This connection</th><td>{% if security.https %}<span class="badge ok">HTTPS</span>{% else %}<span class="badge plain">HTTP</span> <span class="muted">fine on your own network; use HTTPS through a reverse proxy anywhere else</span>{% endif %}</td></tr>
+  <tr><th>Reverse proxy</th><td>{% if security.proxies %}trusted: <code>{{ security.proxies }}</code>{% else %}<span class="muted">none trusted (forwarded headers are ignored)</span>{% endif %}{% if security.public_url %}<br>public address: <code>{{ security.public_url }}</code>{% endif %}</td></tr>
+  {% if security.short_password %}<tr><th>Password</th><td><span class="badge warn">short</span> the password from the environment has fewer than 12 characters</td></tr>{% endif %}
+</table>
+<div class="hrow"><h2>Security log</h2>{% call info("i-audit") %}Sign-ins, failed attempts and changes to the password, two-factor sign-in and sessions, newest first. Kept in <code>audit.log</code> in the data folder; it never contains a password, code or key.{% endcall %}</div>
+{% if audit %}
+<table class="stack">
+  <tr><th>When</th><th>What</th><th>From</th><th></th></tr>
+  {% for e in audit %}<tr><td class="muted">{{ e.when | when }}</td><td>{{ e.event }}</td><td><code>{{ e.ip or "-" }}</code></td><td class="muted">{{ e.more }}</td></tr>{% endfor %}
+</table>
+{% else %}<p class="muted">Nothing yet.</p>{% endif %}
+{% endblock %}

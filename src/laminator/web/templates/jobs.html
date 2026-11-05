@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}Runs - laminator{% endblock %}
+{% block body %}
+<div class="hrow">
+  <h1>Runs</h1>
+  {% call info("i-runs") %}Everything laminator does to your server or its own files happens as a <strong>run</strong>, so you can watch it line by line and look back at it later. Only one run works at a time. A request made meanwhile waits in line and starts by itself; a small one (a single title) goes first, in a gap of the big run, which then carries on. The list below covers runs since the web UI last started, newest first. Open a run to read its log.{% endcall %}
+</div>
+{% if can_write %}
+<div class="actions">
+  <div class="fieldhead act"><a class="btn" href="/confirm?action=apply&scope=all&s={{ srv }}">Apply to everything{% if srv_label %} on {{ srv_label }}{% endif %}&hellip;</a>
+    {% call info("i-act-apply", "act") %}<dl class="opts">
+      <dt>What it does</dt><dd>Puts the score badge on every poster in every library of {{ srv_label or "the server" }}. For each film or show it keeps the untouched original poster (saved the first time), looks up the score from MDBList, draws it on that original with the chosen template (never on top of an earlier badge), and uploads the result. A normal metadata refresh in the server leaves it in place. If you turned it on in Settings, the same score is also written to the item's CriticRating.</dd>
+      <dt>Safe to repeat</dt><dd>Items whose original, score and template are unchanged are skipped, so running it again only redraws what changed. A poster you picked yourself in the server is noticed and adopted as the new original, and an overlay that a "replace all images" refresh wiped is redrawn.</dd></dl>{% endcall %}</div>
+  <div class="fieldhead act"><a class="btn" href="/confirm?action=maintain&scope=all&s={{ srv }}">Run full maintenance now{% if srv_label %} on {{ srv_label }}{% endif %}&hellip;</a>
+    {% call info("i-act-maint", "act") %}<dl class="opts">
+      <dt>What it does</dt><dd>The same pass that runs by itself once a month. First an apply to everything (so scores, template changes and metadata overrides are all brought up to date), then a short summary, then a clean-up.</dd>
+      <dt>The clean-up part</dt><dd>Removes saved posters and records of films that stayed missing from the server past the grace period, orphan files nothing refers to, and old caches and exports. Anything that could matter goes to the trash first, where you can restore it.</dd></dl>{% endcall %}</div>
+  <div class="fieldhead act"><a class="btn plain" href="/cleanup?s={{ srv }}">Clean up&hellip;</a>
+    {% call info("i-act-clean", "act") %}<dl class="opts">
+      <dt>What it does</dt><dd>Opens a page that shows exactly what laminator no longer needs (records of films removed from the library, orphan files, old caches) and how much space it takes. Nothing is removed until you confirm there, and a server or NAS that is merely offline never counts as "removed".</dd></dl>{% endcall %}</div>
+  <div class="fieldhead act"><a class="btn danger" href="/confirm?action=restore&scope=all&what=all&s={{ srv }}">Restore everything{% if srv_label %} on {{ srv_label }}{% endif %}&hellip;</a>
+    {% call info("i-act-restore", "act") %}<dl class="opts">
+      <dt>What it does</dt><dd>Undoes everything laminator changed on {{ srv_label or "the server" }}: every original poster is uploaded back (the score badges disappear), and every metadata value it overrode, including CriticRating, goes back to what it was, with the locks it added removed.</dd>
+      <dt>What it leaves alone</dt><dd>A metadata value you edited by hand in the server afterwards is reported, not overwritten. You get a confirmation page first.</dd></dl>{% endcall %}</div>
+</div>
+{% endif %}
+<div class="hrow"><h2>Run history</h2>
+  {% call info("i-hist") %}<dl class="opts">
+    <dt>Kinds of run</dt>
+    <dd><strong>Apply the score overlay&hellip;</strong> draws badges on posters (one item, one library, or everything). <strong>Scheduled check (new or changed posters)</strong> is the quick automatic pass: it only handles new items and posters that changed in the server, and skips everything else. <strong>Scheduled maintenance</strong> is the monthly full pass. <strong>Apply metadata overrides</strong> writes the values from <code>overrides.yaml</code> to the server, locks exactly those fields and reads them back to confirm. <strong>New poster for&hellip;</strong> / <strong>go back to an earlier poster&hellip;</strong> change one item's poster. <strong>Export posters</strong> builds the downloadable zip. <strong>Clean up</strong> and <strong>restore from trash</strong> remove or bring back leftovers. <strong>Backup</strong>, <strong>verify</strong> and <strong>restore</strong> work on laminator's own data. <strong>Restore&hellip;</strong> undoes posters and/or metadata.</dd>
+    <dt>Status</dt>
+    <dd><strong>queued</strong>: waiting for the run in front of it. <strong>running</strong>: still working. <strong>done</strong>: finished without errors. <strong>failed</strong>: finished with at least one error line; the rest of the run still completed.</dd>
+    <dt>Words at the start of log lines</dt>
+    <dd><code>apply</code> a poster was uploaded, <code>render</code> an image was made without uploading, <code>skip</code> nothing was done (the reason follows), <code>lost</code> an overlay had vanished from the server and is redrawn, <code>new</code> you changed the poster in the server and it is adopted as the new original, <code>critic</code> CriticRating updated, <code>restore</code> something was put back, <code>warn</code> / <code>error</code> need your attention.</dd></dl>{% endcall %}
+</div>
+{% include "_jobs_table.html" %}
+{% endblock %}

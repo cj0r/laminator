@@ -1,0 +1,33 @@
+# Copy next to a data folder and adjust, then:  docker compose up -d   and open http://<host>:5264
+# One-off commands:  docker compose run --rm laminator apply --library Movies
+services:
+  laminator:
+    image: cj0r/laminator:latest        # the newest release; `:dev` is the latest test build, `:0.2.0` pins an exact release
+    restart: unless-stopped
+    ports:
+      - "5264:5264"                     # behind a reverse proxy on the same host: "127.0.0.1:5264:5264" so only the proxy can reach it
+    environment:
+      # First start: `docker logs laminator` prints a setup code; open the UI and choose your password with it.
+      # To preset it instead (optional): LAMINATOR_ADMIN_PASSWORD=..., or LAMINATOR_ADMIN_PASSWORD_FILE=/run/secrets/laminator_password
+      # Behind a reverse proxy (see Security in the user guide):
+      # - LAMINATOR_TRUSTED_PROXIES=172.18.0.0/16      # the proxy's address or network: only its X-Forwarded-* headers are believed
+      # - LAMINATOR_PUBLIC_URL=https://laminator.example.com
+      # Optional: keys can be entered in Settings instead (API_EMBY / API_JELLYFIN / API_MDBLIST, or the same with _FILE)
+      - TZ=America/New_York
+    volumes:
+      - ./data:/data                    # settings, saved original posters, state, backups: BACK THIS UP
+      # - ./assets:/assets                            # custom base posters (Settings > Custom posters > folder: /assets)
+      # - /mnt/nas/laminator-backups:/backups         # optional second backup copy
+    user: "1000:1000"                   # the user and group that own ./data (run `id` to find yours); on Unraid: "99:100" (nobody:users)
+    # The image is hardened on its own (unprivileged, no capabilities, no setuid programs, cannot change its own files).
+    # Optional extra belt and braces, if you like them:
+    # read_only: true
+    # tmpfs: ["/tmp:size=64m,mode=1777"]
+    # cap_drop: [ALL]
+    # security_opt: ["no-new-privileges:true"]
+    # secrets:
+    #   - laminator_password
+
+# secrets:
+#   laminator_password:
+#     file: ./laminator_password.txt    # chmod 600

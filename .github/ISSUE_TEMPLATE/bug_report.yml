@@ -1,0 +1,53 @@
+name: Bug report
+description: Something in laminator isn't working
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Security problems go through the Security tab's "Report a vulnerability", not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what laminator did instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: laminator version
+      description: Shown next to the logo in the web UI.
+      placeholder: v0.2.0
+    validations:
+      required: true
+  - type: dropdown
+    id: server
+    attributes:
+      label: Media server
+      options: [Emby, Jellyfin, Both]
+    validations:
+      required: true
+  - type: input
+    id: server-version
+    attributes:
+      label: Media server version
+      placeholder: "4.10.2 / 10.11.11"
+  - type: input
+    id: host
+    attributes:
+      label: Where it runs
+      description: The host and how you start the container.
+      placeholder: Docker Compose on Ubuntu, Unraid, Synology, Docker Desktop...
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log
+      description: The log of the run that went wrong (Runs in the web UI). Check that no API keys are in it.
+      render: text
+  - type: textarea
+    id: config
+    attributes:
+      label: Override entry or template
+      description: The overrides.yaml entry or template involved, if any. Leave out keys and private paths.
+      render: yaml

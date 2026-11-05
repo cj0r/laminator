@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}Clean up - laminator{% endblock %}
+{% block body %}
+<div class="hrow">
+  <h1>Clean up{% if srv_label %} <span class="muted">{{ srv_label }}</span>{% endif %}</h1>
+  {% call info("i-cleanup") %}Removes what laminator no longer needs. Records of a film that has been <strong>removed from the library</strong> are only cleaned up once it has stayed
+missing for <strong>{{ lim.grace_days }} days</strong> (and is still missing when the clean-up runs), so a server or NAS that is merely offline never causes a purge.
+Those records go to <code>trash/</code> and are deleted for good after {{ lim.trash_days }} days; only things that can be regenerated (old renders, caches, export packages)
+are deleted straight away. This runs automatically as part of the monthly maintenance; this page shows the plan and lets you run it now.
+Change the periods under <a href="/settings">Settings</a>.{% endcall %}
+</div>
+{% if note_text %}<p class="note {{ note_kind }}">{{ note_text }}{% if note_detail %} {{ note_detail }}{% endif %}</p>{% endif %}
+{% if sp.problem %}<p class="note warn">{{ sp.problem }}</p>{% endif %}
+<p><a href="/trash?s={{ srv }}">See the trash and put things back&hellip;</a></p>
+<h2>Items that left the server</h2>
+{% if gone %}
+<table class="stack"><tr><th>Item</th><th>Missing since</th><th>Saved posters</th><th>Size</th><th></th></tr>
+  {% for g in gone %}<tr><td>{{ g.name }}</td><td>{{ g.since }}</td><td>{{ g.files }}</td><td>{{ g.mb }} MB</td><td>to trash</td></tr>{% endfor %}</table>
+{% else %}<p class="muted">None are past the grace period.</p>{% endif %}
+{% if waiting %}
+<p class="muted">Missing from the server but still inside the grace period (nothing happens yet; they are unmarked if they come back):</p>
+<ul>{% for w in waiting %}<li>{{ w.name }}: {{ w.days }} more day(s)</li>{% endfor %}</ul>
+{% endif %}
+<h2>Other</h2>
+<table><tr><th>What</th><th>How many</th><th>Size</th><th>Action</th></tr>
+  {% for label, n, mb, what in rows %}<tr><td>{{ label }}</td><td>{{ n }}</td><td>{{ mb }} MB</td><td>{{ what }}</td></tr>{% endfor %}</table>
+{% if nothing %}<p class="muted">Nothing to clean up right now.</p>{% endif %}
+{% if can_write %}
+<form method="post" action="/cleanup/run" class="optform">
+  <input type="hidden" name="token" value="{{ csrf(request) }}">
+  <input type="hidden" name="srv" value="{{ srv }}">
+  <label class="check"><input type="checkbox" name="safety" value="1"> Also move safety copies (archive and pre-restore folders) older than 180 days to the trash</label>
+  <div class="actions"><button class="btn">Clean up now</button><a class="btn plain" href="/jobs">Runs</a></div>
+</form>
+{% endif %}
+{% endblock %}

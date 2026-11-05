@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Restore a backup - laminator{% endblock %}
+{% block body %}
+<div class="confirm">
+  <h1>Restore {{ name }}?</h1>
+  <p>Made {{ created }}; {{ n_files }} files:</p>
+  <ul>{% for label, v in servers %}<li><strong>{{ label }}</strong>: {{ v.posters }} poster record(s), {{ v.meta }} metadata record(s), {{ v.originals }} saved original(s)</li>{% endfor %}</ul>
+  <p class="warnbox">This <strong>replaces</strong> laminator's current data with the backup's.
+  {% if will_move %}These are moved aside first, not deleted, into a <code>pre-restore-&hellip;</code> folder in the data folder, so you can undo it: <code>{{ will_move | join(", ") }}</code>.
+  {% else %}There is no current data that would be replaced.{% endif %}
+  Every file is checked against its checksum before anything is touched; if the backup is damaged nothing changes.
+  Your media server itself is not touched. No job may be running.</p>
+  <form method="post" action="/backups/restore" autocomplete="off">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <input type="hidden" name="name" value="{{ name }}">
+    {% if has_secrets %}
+    <label><span class="lt">Passphrase for the encrypted API keys and password <span class="muted">(leave empty to restore everything except those)</span></span>
+      <input type="password" name="passphrase" autocomplete="off" maxlength="200"></label>
+    {% endif %}
+    <p>Type <code>RESTORE</code> to confirm.</p>
+    <input name="phrase" autocomplete="off" required placeholder="RESTORE">
+    <div class="actions"><button class="btn danger">Restore</button><a class="btn plain" href="/settings">Cancel</a></div>
+  </form>
+</div>
+{% endblock %}

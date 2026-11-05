@@ -1,0 +1,28 @@
+[project]
+name = "laminator"
+dynamic = ["version"]
+description = "Poster overlays and metadata overrides for Emby and Jellyfin"
+license = "GPL-3.0-only"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["httpx", "pillow", "pyyaml", "fastapi", "uvicorn", "jinja2", "python-multipart", "cryptography", "smbprotocol", "segno"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+laminator = "laminator.cli:main"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = {attr = "laminator.__version__"}   # the one version number, in src/laminator/__init__.py
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+laminator = ["assets/fonts/*", "assets/templates/*", "web/templates/*", "web/static/*", "web/static/fonts/*"]

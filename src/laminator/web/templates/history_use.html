@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Go back to this poster - laminator{% endblock %}
+{% block body %}
+<div class="confirm">
+  <h1>Go back to this poster for {{ it.name }}?</h1>
+  <p><img class="preview" src="/history/preview/{{ it.id }}/{{ name }}?s={{ srv }}" alt="preview with overlay"></p>
+  {% if entry %}<p class="muted">Saved {{ entry.when if entry.when else "" }}{% if entry.first %} &middot; this is the first poster, from before laminator changed anything{% endif %}</p>{% endif %}
+  {% if is_current %}<p class="note warn">This is already the current original. Applying only re-checks the overlay.</p>{% endif %}
+  <p class="warnbox">This puts the saved poster on {{ srv_label }} and applies your score overlay to it. The poster you are leaving stays in the history, so you can come back to it.</p>
+  <form method="post" action="/history/use">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <input type="hidden" name="srv" value="{{ srv }}">
+    <input type="hidden" name="item" value="{{ it.id }}">
+    <input type="hidden" name="name" value="{{ name }}">
+    <div class="actions"><button class="btn">Use this poster</button><a class="btn plain" href="/history/{{ it.id }}?s={{ srv }}">Cancel</a></div>
+  </form>
+</div>
+{% endblock %}

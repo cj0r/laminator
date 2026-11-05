@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}Choose a poster - laminator{% endblock %}
+{% block body %}
+<p><a href="/item/{{ it.id }}?s={{ srv }}">&larr; {{ it.name }}</a></p>
+{% if custom %}<p class="note warn">This title has a custom poster (<code>{{ custom }}</code>), and it wins over any poster you pick here. <a href="/item/{{ it.id }}?s={{ srv }}#custom">Remove it</a> first to use another one.</p>{% endif %}
+<div class="hrow">
+  <h1>Choose a poster for {{ it.name }} <span class="muted">{{ it.year or "" }}</span></h1>
+  {% call info("i-posters") %}Candidates from the providers set up in your {{ srv_label }} server. Pick one to preview it with your score overlay; using it keeps the current
+poster as the original (so it can be restored) and then applies the overlay. Images are fetched through laminator from a fixed list of image hosts only.{% endcall %}
+</div>
+{% if error %}<p class="note bad">{{ error }}</p>{% endif %}
+{% if dropped %}<p class="muted">{{ dropped }} candidate(s) were left out because they were not on a trusted https image host.</p>{% endif %}
+<form class="filters" method="get" action="/posters/{{ it.id }}">
+  <input type="hidden" name="s" value="{{ srv }}">
+  <select name="p"><option value="">All sources ({{ all_total }})</option>{% for x in providers %}<option {{ "selected" if x == p }}>{{ x }}</option>{% endfor %}</select>
+  <select name="lang"><option value="">Any language</option>{% for l in langs %}<option {{ "selected" if l == lang }}>{{ l }}</option>{% endfor %}</select>
+  <button class="btn plain">Filter</button>
+</form>
+<p class="muted">{{ total }} candidate{{ "" if total == 1 else "s" }}, real scores first, then like-counts{% if pages > 1 %} - page {{ page_no }} of {{ pages }}{% endif %}</p>
+<div class="grid">
+  {% for c in cands %}
+  <div class="card">
+    <img loading="lazy" src="/posters/thumb/{{ it.id }}/{{ c.cid }}?s={{ srv }}" alt="candidate">
+    <div class="meta">
+      <strong>{{ c.label }}</strong> <span class="muted">{{ c.language or "no language" }}</span>
+      <div class="muted">{{ c.width }}&times;{{ c.height }}{% if c.rating_type == "Score" and c.rating %} &middot; &#9733; {{ "%.1f"|format(c.rating) }} ({{ c.votes }}){% elif c.rating %} &middot; &#9829; {{ c.rating | int }}{% endif %}</div>
+      <div class="actions">
+        <a href="/posters/preview/{{ it.id }}/{{ c.cid }}?s={{ srv }}" target="_blank" rel="noopener">Preview with overlay</a>
+        {% if can_write %}<a href="/posters/use/{{ it.id }}/{{ c.cid }}?s={{ srv }}">Use&hellip;</a>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% else %}<p class="muted">No candidates match.</p>{% endfor %}
+</div>
+{% if pages > 1 %}<div class="pager">
+  {% if page_no > 1 %}<a href="/posters/{{ it.id }}?s={{ srv }}&p={{ p | urlencode }}&lang={{ lang | urlencode }}&page_no={{ page_no - 1 }}">Previous</a>{% endif %}
+  {% if page_no < pages %}<a href="/posters/{{ it.id }}?s={{ srv }}&p={{ p | urlencode }}&lang={{ lang | urlencode }}&page_no={{ page_no + 1 }}">Next</a>{% endif %}
+</div>{% endif %}
+{% endblock %}

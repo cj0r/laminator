@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}Poster history - laminator{% endblock %}
+{% block body %}
+<p><a href="/item/{{ it.id }}?s={{ srv }}">&larr; {{ it.name }}</a></p>
+<div class="hrow">
+  <h1>Poster history for {{ it.name }} <span class="muted">{{ it.year or "" }}</span></h1>
+  {% call info("i-history") %}Every poster laminator has saved for this item, newest first. Nothing here is ever deleted. Going back puts that poster on {{ srv_label }}
+and applies your score overlay to it; the poster you leave stays in this list.{% endcall %}
+</div>
+{% if not entries %}
+<p class="muted">Nothing saved yet{% if not managed %}: laminator has not changed this item's poster, so the poster in {{ srv_label }} is still the original{% endif %}.</p>
+{% else %}
+{% if can_write %}<div class="actions">
+  {% if previous %}<a class="btn" href="/history/use/{{ it.id }}/{{ previous.name }}?s={{ srv }}">Go back to the previous poster&hellip;</a>{% endif %}
+  {% if first %}<a class="btn plain" href="/history/use/{{ it.id }}/{{ first.name }}?s={{ srv }}">Back to the very first poster&hellip;</a>{% endif %}
+</div>{% endif %}
+<div class="grid">
+  {% for e in entries %}
+  <div class="card">
+    <img loading="lazy" src="/history/thumb/{{ it.id }}/{{ e.name }}?s={{ srv }}" alt="saved poster">
+    <div class="meta">
+      {% if e.current %}<span class="badge ok">current original</span>{% endif %}
+      {% if e.first %}<span class="badge orig">first poster</span>{% endif %}
+      <div class="muted">saved {{ e.when }}<br>{{ (e.size / 1000) | int }} KB</div>
+      <div class="actions">
+        <a href="/history/preview/{{ it.id }}/{{ e.name }}?s={{ srv }}" target="_blank" rel="noopener">Preview with overlay</a>
+        {% if can_write and not e.current %}<a href="/history/use/{{ it.id }}/{{ e.name }}?s={{ srv }}">Use&hellip;</a>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

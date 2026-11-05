@@ -1,0 +1,17 @@
+# Poster overlay template. All sizes are fractions of poster width/height so it
+# works for any poster resolution.
+sources: [aggregate, imdb, tmdb, letterboxd]   # first one MDBList has a value for wins; 'aggregate' = MDBList's combined score
+decimals: 1                          # 7.1; use 0 for 71. Letterboxd/others are shown on a 0-10 scale
+gradient:
+  height: 0.12          # fraction of poster height covered
+  color: [0, 0, 0]
+  max_opacity: 0.65     # opacity at the very bottom edge
+score:
+  font: fonts/Anton-Regular.ttf   # bundled (OFL). Alternatives: BarlowCondensed-SemiBold.ttf / -Bold.ttf (size 0.053)
+  size: 0.0433            # font size, fraction of poster height (sized per font to match digit height)
+  color: [255, 255, 255]
+  anchor: bottom-right
+  margin_x: 0.055       # fraction of poster width
+  margin_y: 0.02        # fraction of poster height
+  embolden: 0           # optional fake-bold outline for single-weight fonts (fraction of font size)
+  shadow: true

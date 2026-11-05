@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}Custom posters - laminator{% endblock %}
+{% block body %}
+<div class="hrow">
+  <h1>Custom posters{% if srv_label %} <span class="muted">on {{ srv_label }}</span>{% endif %}</h1>
+  {% call info("i-assets") %}<dl class="opts">
+    <dt>What this is</dt><dd>A poster you place here replaces the poster {{ srv_label or "the server" }} has as the <strong>base</strong> laminator draws the score on. It is meant for things the server cannot find the right artwork for, such as <strong>fan edits</strong>. The poster the server had is kept in the item's poster history, so you can always go back.</dd>
+    <dt>Where to put files</dt><dd>In <code class="cmd">{{ root }}</code> name the poster after the <em>folder</em> the media is in. A movie at <code>/media/movies/Dumbo/dumbo.mkv</code> uses <code>Dumbo/poster.jpg</code>. A show uses its own folder name. You can also keep them per library (<code>Movies/Dumbo/poster.jpg</code>), use a flat file named after the folder (<code>Dumbo.jpg</code>), or, for movies that share one folder, name the file after the movie file. JPEG, PNG or WebP; upper and lower case do not matter.</dd>
+    <dt>How it is used</dt><dd>The next run that handles the item (<em>Use custom posters</em> below, a scheduled check, or an apply) makes the file the base poster and draws the score on it. Replace the file and it is picked up the same way. While a custom poster exists it wins over a poster you pick in the server or from the poster chooser.</dd>
+    <dt>Removing one</dt><dd>Remove it on the item's page. The file is moved to the trash folder, not deleted, and the item keeps its current base poster until you go back to an earlier one in Poster history.</dd></dl>{% endcall %}
+</div>
+{% if note_text %}<p class="note {{ note_kind or 'ok' }}">{{ note_text }}{% if note_detail %} {{ note_detail }}{% endif %}</p>{% endif %}
+<div class="actions">
+  {% if can_write and matched %}<form method="post" action="/assets/apply" class="inline"><input type="hidden" name="token" value="{{ csrf(request) }}"><input type="hidden" name="srv" value="{{ srv }}">
+    <button class="btn">Use custom posters now{% if waiting %} ({{ waiting }} waiting){% endif %}</button></form>{% endif %}
+  <a class="btn plain" href="/settings#assets">Change the folder&hellip;</a>
+</div>
+<p class="muted">Folder: <code>{{ root }}</code>{% if not exists %} (it does not exist yet; it is created when you upload a poster){% endif %}{% if custom_root %} &middot; set in Settings{% endif %}</p>
+<h2>Matched to your titles</h2>
+{% if matched %}
+<table class="stack">
+  <tr><th>Title</th><th>Library</th><th>File</th><th>Status</th></tr>
+  {% for m in matched %}
+  <tr><td><a href="/item/{{ m.id }}?s={{ srv }}">{{ m.name }}</a> <span class="muted">{{ m.year or "" }}</span></td><td>{{ m.lib }}</td><td><code>{{ m.rel }}</code></td>
+      <td><span class="badge {{ m.cls }}">{{ m.text }}</span></td></tr>
+  {% endfor %}
+</table>
+{% else %}<p class="muted">No poster in the folder matches a title on {{ srv_label or "this server" }} yet. Upload one from an item's page, or put files in the folder as described in the (i) above.</p>{% endif %}
+{% if n_unmatched %}
+<div class="hrow"><h2>Not matched to any title</h2>{% call info("i-unmatched") %}These files are in the folder but their names do not match the media folder of any title on {{ srv_label or "this server" }}. Check the spelling against the folder name on disk (a movie uses the folder it lives in, not its title). They may also belong to the other server or to titles that are not in this library any more.{% endcall %}</div>
+<ul class="plain">{% for u in unmatched %}<li><code>{{ u }}</code></li>{% endfor %}</ul>
+{% if n_unmatched > unmatched | length %}<p class="muted">and {{ n_unmatched - unmatched | length }} more.</p>{% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>laminator - first start</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v={{ asset_v }}">
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_v }}">
+</head>
+<body class="login">
+  <form method="post" action="/setup" class="box loginbox">
+    <img src="/static/logo.svg?v={{ asset_v }}" alt="">
+    <span class="wordmark">LAMINATOR</span>
+    <span class="tag">Shield the surface. Elevate the finish.</span>
+    <span class="tag ver-line">v{{ app_version }}</span>
+    {% if error %}<p class="err">{{ error }}</p>{% endif %}
+    <p class="muted codehint">Welcome. Choose the password for this laminator.</p>
+    <label>Setup code <input name="code" autofocus required autocomplete="off" maxlength="12" spellcheck="false" placeholder="XXXX-XXXX"></label>
+    <p class="muted codehint">Printed in the container's log when it started:<br><code>docker logs laminator</code></p>
+    <label>Password <span class="muted">(at least {{ pw_min }} characters)</span> <input type="password" name="password" required minlength="{{ pw_min }}" maxlength="200" autocomplete="new-password"></label>
+    <label>Password again <input type="password" name="confirm" required minlength="{{ pw_min }}" maxlength="200" autocomplete="new-password"></label>
+    <button class="btn">Set password and sign in</button>
+  </form>
+</body>
+</html>

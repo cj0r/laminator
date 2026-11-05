@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>laminator - two-factor sign-in</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v={{ asset_v }}">
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_v }}">
+</head>
+<body class="login">
+  <form method="post" action="/login/code" class="box loginbox">
+    <img src="/static/logo.svg?v={{ asset_v }}" alt="">
+    <span class="wordmark">LAMINATOR</span>
+    <span class="tag">Shield the surface. Elevate the finish.</span>
+    <span class="tag ver-line">v{{ app_version }}</span>
+    {% if error %}<p class="err">{{ error }}</p>{% endif %}
+    <p class="muted codehint">Enter the 6-digit code from your authenticator app, or one of your recovery codes.</p>
+    <label>Code <input name="code" autofocus required autocomplete="one-time-code" inputmode="numeric" maxlength="20" spellcheck="false"></label>
+    <button class="btn">Continue</button>
+    <a class="muted small" href="/login">Start over</a>
+  </form>
+</body>
+</html>

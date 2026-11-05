@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}Edit overrides - laminator{% endblock %}
+{% block body %}
+<div class="hrow">
+  <h1>Edit overrides.yaml</h1>
+  {% call info("i-overrides_edit") %}<dl class="opts">
+    <dt>Saving</dt><dd>The file is checked when you save: nothing invalid is ever written. Comments and layout are kept exactly as you type them. The version being replaced is kept as <code>overrides.yaml.prev</code>. Saving changes only this file; nothing reaches your server until you apply it on the Metadata page.</dd>
+    <dt>Format</dt><dd>Under <code>overrides:</code>, one entry per item. <code>match</code> says which item (an IMDb, TMDb or TVDB id, or <code>library</code> + <code>title</code> + optional <code>year</code>). Then any of: <code>rating</code>, <code>title</code>, <code>sort_title</code>, <code>original_title</code>, <code>overview</code>, <code>tagline</code>, <code>critic_rating</code> (0-100) and the lists <code>tags</code>, <code>genres</code>, <code>studios</code> (a list replaces everything; <code>{add: [..], remove: [..]}</code> changes only those; <code>[]</code> clears), all written to the server and locked (Emby cannot lock a tagline); and, for the poster only, <code>score</code> (0-10 or short text like <code>A+</code>), <code>template</code>, <code>source</code> and <code>overlay: false</code>. <code>server: emby</code> or <code>jellyfin</code> limits an entry to one server.</dd>
+    <dt>Example</dt><dd><pre>overrides:
+  - match: {imdb: tt0319343}
+    rating: PG-13
+    sort_title: "Elf (2003)"
+  - match: {library: Movies, title: Dumbo, year: 1941}
+    overview: "My own description."
+  - match: {imdb: tt0107290}
+    tags: [Fan Edit]
+    genres: {add: [Holiday]}
+    critic_rating: 80
+    score: 9.5</pre></dd>
+    <dt>The file</dt><dd><code>{{ file }}</code></dd></dl>{% endcall %}
+</div>
+{% if error %}<p class="note bad">{{ error }} <span class="muted">(nothing was saved; your text is still below)</span></p>{% endif %}
+<form method="post" action="/metadata/edit" class="editform">
+  <input type="hidden" name="token" value="{{ csrf(request) }}">
+  <textarea name="text" rows="26" spellcheck="false" wrap="off">{{ text }}</textarea>
+  <div class="actions"><button class="btn">Check and save</button><a class="btn plain" href="/metadata">Cancel</a></div>
+</form>
+{% if has_prev %}
+<form method="post" action="/metadata/edit/undo"><input type="hidden" name="token" value="{{ csrf(request) }}">
+  <button class="btn plain">Go back to the previous version</button></form>
+{% endif %}
+{% endblock %}

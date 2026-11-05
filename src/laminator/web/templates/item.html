@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}{{ it.name }} - laminator{% endblock %}
+{% block body %}
+<p><a href="/library?lib={{ lib | urlencode }}&s={{ srv }}">&larr; {{ lib }}</a></p>
+<h1>{{ it.name }} <span class="muted">{{ it.year or "" }}</span> <span class="badge {{ cls }}">{{ label }}</span></h1>
+<div class="three">
+  <figure><img src="/img/{{ it.id }}/original?s={{ srv }}" alt="original"><figcaption>Original{% if not row %} (current poster; not managed yet){% endif %}</figcaption></figure>
+  <figure><img src="/img/{{ it.id }}/current?s={{ srv }}" alt="on the server"><figcaption>On the server now</figcaption></figure>
+  <figure><img src="/img/{{ it.id }}/preview?name={{ template | urlencode }}&s={{ srv }}" alt="preview"><figcaption><form class="previewform" method="get"><input type="hidden" name="s" value="{{ srv }}">
+      <label for="pv-tpl">Preview with template</label>
+      <select name="template" id="pv-tpl" data-autosubmit>{% for t in templates %}<option value="{{ t }}" {{ "selected" if t == template }}>{{ t|tname }}</option>{% endfor %}</select>
+      <noscript><button class="btn plain small">Show preview</button></noscript></form></figcaption></figure>
+</div>
+<div class="actions"><a class="btn plain" href="/posters/{{ it.id }}?s={{ srv }}">Choose another poster&hellip;</a>
+  <a class="btn plain" href="/history/{{ it.id }}?s={{ srv }}">Poster history&hellip;</a></div>
+{% if can_write %}
+<div class="actions">
+  <a class="btn" href="/confirm?action=apply&scope=item&item={{ it.id }}&template={{ template | urlencode }}&s={{ srv }}">Apply overlay&hellip;</a>
+  {% if row %}
+  <a class="btn danger" href="/confirm?action=restore&scope=item&item={{ it.id }}&what=posters&s={{ srv }}">Restore original poster&hellip;</a>
+  {% endif %}
+  {% if meta_rows %}
+  <a class="btn danger" href="/confirm?action=restore&scope=item&item={{ it.id }}&what=meta&s={{ srv }}">Restore metadata&hellip;</a>
+  {% endif %}
+</div>
+{% endif %}
+{% if can_write %}
+<section class="card2" id="custom">
+  {% set cp = custom %}
+  <div class="hrow subhead first"><h3 class="sub">Custom base poster</h3>{% call info("i-custom") %}<dl class="opts">
+    <dt>What it does</dt><dd>Use your own poster for this title instead of the one {{ srv_label }} has, for example for a fan edit. laminator draws the score on <em>your</em> poster. The poster {{ srv_label }} had stays in the poster history, so you can go back.</dd>
+    <dt>Where it is stored</dt><dd>As <code>{{ cp.folder or "(folder name)" }}/poster.jpg</code> (or .png / .webp) in <code class="cmd">{{ cp.root }}</code> Posters you place there by hand with the same name are used too.</dd>
+    <dt>Good to know</dt><dd>While a custom poster exists it wins over a poster picked in the server or from the poster chooser. JPEG, PNG or WebP up to 15 MB; a poster that already carries a score overlay is refused.</dd></dl>{% endcall %}</div>
+  {% if cp.rel %}<p>Using <code>{{ cp.rel }}</code> <span class="badge {{ cp.cls }}">{{ cp.text }}</span></p>{% else %}<p class="muted">No custom poster. {{ srv_label }}'s own poster is the base.</p>{% endif %}
+  <form method="post" action="/assets/upload" enctype="multipart/form-data" class="optform">
+    <input type="hidden" name="token" value="{{ csrf(request) }}"><input type="hidden" name="srv" value="{{ srv }}"><input type="hidden" name="item" value="{{ it.id }}">
+    <label><span class="lt">{{ "Replace it with" if cp.rel else "Choose a poster" }} <span class="muted">(JPEG, PNG or WebP)</span></span><input type="file" name="file" accept="image/jpeg,image/png,image/webp" required></label>
+    <div class="row"><button class="btn">{{ "Replace and apply" if cp.rel else "Upload and apply" }}</button></div>
+  </form>
+  {% if cp.rel %}<form method="post" action="/assets/remove" class="inline"><input type="hidden" name="token" value="{{ csrf(request) }}"><input type="hidden" name="srv" value="{{ srv }}"><input type="hidden" name="item" value="{{ it.id }}">
+    <button class="btn danger small">Remove the custom poster</button></form>{% endif %}
+</section>
+{% endif %}
+{% if can_write %}
+{% set f = ov.form if ov else {} %}{% set md = ov.modes if ov else {} %}
+<details class="card2 addov"{% if ov %} open{% endif %}>
+  <summary>{% if ov %}Override for this item (in overrides.yaml){% else %}Add an override for this item{% endif %}</summary>
+  {% if ov %}<p class="note ok">This title already has an override in <code>overrides.yaml</code>. The fields below show its current values; saving replaces that entry (no second one is added).</p>{% endif %}
+  <div class="hrow"><span class="muted">How this works</span>{% call info("i-addov") %}<dl class="opts">
+    <dt>What it does</dt><dd>{% if ov %}Replaces this title's entry in <code>overrides.yaml</code>; every other entry and comment in the file stays as it is.{% else %}Appends one entry to <code>overrides.yaml</code> (matched by {{ "its " ~ match_label }}).{% endif %} Nothing is written to {{ srv_label }} until you review and apply it on the Metadata page. Leave a field empty to leave it alone.</dd>
+    <dt>Written to the server</dt><dd>Content rating, title, sort title, original title, description, tagline, critic rating, tags, genres and studios. Each is backed up, locked (except the tagline, which Emby cannot lock: a refresh can undo it, and the next apply writes it again), read back, and restorable.</dd>
+    <dt>Lists (tags, genres, studios)</dt><dd><em>Replace</em> sets the whole list, <em>Add</em> and <em>Remove</em> change only the names you type, <em>Clear</em> empties it. Separate names with commas or new lines.</dd>
+    <dt>Critic rating</dt><dd>A number from 0 to 100. When you set one here, laminator stops writing the automatic score into this title's critic rating.</dd>
+    <dt>On the poster only</dt><dd>The score (0-100, the same scale as the critic rating: 66 shows as 6.6 on the badge), template and score source for this one title, or no score at all. <strong>Default</strong> means the title uses what it uses now: the template your scheduled runs use ({{ usual_template|tname }}) and that template's score source ({{ usual_source_label }}). Pick another to override it for this title. These never change your server's metadata.</dd></dl>{% endcall %}</div>
+  <form method="post" action="/metadata/add" class="optform" autocomplete="off">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <input type="hidden" name="srv" value="{{ srv }}">
+    <input type="hidden" name="item" value="{{ it.id }}">
+    {% if ov %}<input type="hidden" name="entry" value="{{ ov.index }}">{% endif %}
+    <div class="hrow subhead first"><h3 class="sub">Written to {{ srv_label }}</h3></div>
+    <label><span class="lt">Title <span class="muted">(now: {{ now.title }})</span></span> <input name="title" maxlength="200" value="{{ f.title or '' }}"></label>
+    <label><span class="lt">Content rating <span class="muted">(now: {{ now.rating }})</span></span>
+      {% if ratings %}<select name="rating"><option value="">(no change)</option>{% for r in ratings %}<option{% if r == f.rating %} selected{% endif %}>{{ r }}</option>{% endfor %}</select>
+      {% else %}<input name="rating" maxlength="40" placeholder="e.g. PG-13" value="{{ f.rating or '' }}">{% endif %}</label>
+    <label><span class="lt">Critic rating <span class="muted">(0-100, now: {{ now.critic_rating }})</span></span> <input name="critic_rating" inputmode="numeric" maxlength="3" class="narrow" value="{{ f.critic_rating if f.critic_rating is not none and "critic_rating" in f else '' }}"></label>
+    <label><span class="lt">Sort title <span class="muted">(now: {{ now.sort_title }})</span></span> <input name="sort_title" maxlength="200" value="{{ f.sort_title or '' }}"></label>
+    <label><span class="lt">Original title <span class="muted">(now: {{ now.original_title }})</span></span> <input name="original_title" maxlength="200" value="{{ f.original_title or '' }}"></label>
+    <label><span class="lt">Tagline <span class="muted">(now: {{ now.tagline }})</span></span> <input name="tagline" maxlength="300" value="{{ f.tagline or '' }}">
+      <span class="check inlinecheck"><input type="checkbox" name="clear_tagline" value="1"{% if md.tagline_clear %} checked{% endif %}> Clear the tagline instead</span></label>
+    <label><span class="lt">Description</span> <textarea name="overview" rows="3" maxlength="5000">{{ f.overview or '' }}</textarea>
+      <span class="check inlinecheck"><input type="checkbox" name="clear_overview" value="1"{% if md.overview_clear %} checked{% endif %}> Clear the description instead</span></label>
+    {% for key, label in (("tags", "Tags"), ("genres", "Genres"), ("studios", "Studios")) %}
+    <div class="field listfield"><div class="lt">{{ label }} <span class="muted">(now: {{ now[key] }})</span></div>
+      <div class="row"><input name="{{ key }}" maxlength="1000" placeholder="Names, separated by commas" value="{{ f[key] or '' }}">
+        <select name="{{ key }}_mode" aria-label="{{ label }}: what to do">{% for v, l in (("replace", "Replace"), ("add", "Add"), ("remove", "Remove"), ("clear", "Clear")) %}<option value="{{ v }}"{% if md[key] == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div></div>
+    {% endfor %}
+    <div class="hrow subhead"><h3 class="sub">On the poster only</h3></div>
+    <label><span class="lt">Poster score <span class="muted">(0-100, or short text like A+)</span></span> <input name="score" maxlength="8" value="{{ f.score if f.score is not none and "score" in f else '' }}"></label>
+    <label><span class="lt">Template for this title</span> <select name="template"><option value="">Default</option>{% for t in templates if t != usual_template or t == f.template %}<option value="{{ t }}"{% if t == f.template %} selected{% endif %}>{{ (t|tname) ~ (" (built-in)" if t == "default" else "") }}</option>{% endfor %}</select></label>
+    <label><span class="lt">Score source for this title</span> <select name="source"><option value="">Default</option>{% for i, l in source_choices if i != usual_source or i == f.source %}<option value="{{ i }}"{% if i == f.source %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
+    <label class="check"><input type="checkbox" name="no_overlay" value="1"{% if ov and ov.no_overlay %} checked{% endif %}> No score on this title (show its poster without one)</label>
+    <div class="row"><button class="btn">{% if ov %}Save override{% else %}Add to overrides.yaml{% endif %}</button></div>
+  </form>
+</details>
+{% endif %}
+<div class="two">
+  <section>
+    <h2>Score</h2>
+    {% if score %}<p class="big">{{ score[1] }} <span class="muted">({{ score[0] }})</span></p>
+    {% else %}<p class="muted">No score available (no MDBList match, or no MDBList key).</p>{% endif %}
+    <h2>On the server</h2>
+    <table>
+      {% for k, v in fields.items() %}<tr><th>{{ k }}</th><td>{{ "(none)" if v is none else v }}</td></tr>{% endfor %}
+      <tr><th>Locked fields</th><td>{{ locked | join(", ") or "(none)" }}</td></tr>
+    </table>
+  </section>
+  <section>
+    <h2>What laminator changed</h2>
+    {% if meta_rows %}
+    <table><tr><th>Field</th><th>Before</th><th>Now</th></tr>
+      {% for m in meta_rows %}<tr><td>{{ m.key }}</td><td>{{ m.old }}</td><td>{{ m.now }}</td></tr>{% endfor %}
+    </table>
+    {% else %}<p class="muted">No metadata changes recorded.</p>{% endif %}
+    <h2>Provider IDs</h2>
+    <table>{% for k, v in it.provider_ids.items() %}{% if k in ("imdb", "tmdb", "tvdb") %}<tr><th>{{ k }}</th><td>{{ v }}</td></tr>{% endif %}{% endfor %}</table>
+  </section>
+</div>
+{% endblock %}

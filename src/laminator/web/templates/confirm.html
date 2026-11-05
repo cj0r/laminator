@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Confirm - laminator{% endblock %}
+{% block body %}
+<div class="confirm">
+  <h1>{{ title }}</h1>
+  <p>{{ effect }}</p>
+  <p class="muted">Affects {{ n }} item{{ "" if n == 1 else "s" }}. It runs in the background and you can follow it on the next page.</p>
+  {% if scope == "selection" %}<div class="note ok selection">
+    {% if desc %}<p><strong>Selection:</strong> {{ desc }}</p>{% endif %}
+    <p class="muted">{{ names | join(", ") }}{% if more %} and {{ more }} more{% endif %}.</p></div>{% endif %}
+  <form method="post" action="/jobs/start">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <input type="hidden" name="action" value="{{ action }}">
+    <input type="hidden" name="scope" value="{{ scope }}">
+    <input type="hidden" name="srv" value="{{ srv }}">
+    <input type="hidden" name="item" value="{{ item }}">
+    <input type="hidden" name="lib" value="{{ lib }}">
+    <input type="hidden" name="what" value="{{ what }}">
+    <input type="hidden" name="template" value="{{ template }}">
+    {% if scope == "selection" %}<input type="hidden" name="ids" value="{{ ids }}"><input type="hidden" name="desc" value="{{ desc }}">{% endif %}
+    {% if action == "apply" and scope != "item" %}
+    <label class="check"><input type="checkbox" name="changed" value="1" {{ "checked" if changed_default }}>
+      Only new items and items whose poster changed <span class="muted">(fast; leave unticked after changing the template, overrides or to refresh scores)</span></label>
+    {% endif %}
+    {% if needs_phrase %}
+    <p class="warnbox">This is every item on the server. Type <code>{{ phrase }}</code> to confirm.</p>
+    <input name="phrase" autocomplete="off" required placeholder="{{ phrase }}">
+    {% endif %}
+    <div class="actions">
+      <button class="btn {{ 'danger' if action == 'restore' else '' }}">{{ "Apply" if action == "apply" else "Restore" }}</button>
+      <a class="btn plain" href="{{ back if back else (('/item/' ~ item ~ '?s=' ~ srv) if scope == 'item' else ('/library?s=' ~ srv)) }}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

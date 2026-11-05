@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Confirm - laminator{% endblock %}
+{% block body %}
+<div class="confirm">
+  <h1>Is this the same {{ label }} server?</h1>
+  <p>You are changing the address from <code>{{ old_url }}</code> to <code>{{ new_url }}</code>.</p>
+  <p class="warnbox">laminator has {{ n }} saved record{{ "" if n == 1 else "s" }} for the old address (posters and metadata it changed, with the originals to restore).
+  Restoring those against a <em>different</em> server would act on the wrong items.</p>
+  <form method="post" action="/settings/server">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <input type="hidden" name="kind" value="{{ kind }}">
+    <input type="hidden" name="url" value="{{ new_url }}">
+    <input type="hidden" name="library" value="{{ library }}">
+    <input type="hidden" name="enabled" value="{{ enabled }}">
+    <div class="actions">
+      <button class="btn" name="decision" value="keep">Same server, new address: keep the saved data</button>
+      <button class="btn danger" name="decision" value="archive">Different server: archive the old data and start clean</button>
+      <a class="btn plain" href="/settings">Cancel</a>
+    </div>
+    <p class="muted">"Archive" moves the old database and originals into an <code>archive-&hellip;</code> folder inside this server's data folder; nothing is deleted.</p>
+  </form>
+</div>
+{% endblock %}

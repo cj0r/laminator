@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}Settings - laminator{% endblock %}
+
+{% macro keybadge(r) %}{% if r.source == "missing" %}<span class="badge warn">key not set</span>
+      {% elif r.source == "settings" %}<span class="badge ok">key saved</span> <code>{{ r.masked }}</code>
+        {% if r.shadows %}{% call info("i-shadow-" ~ r.name) %}This saved key overrides the one in .env / the environment.{% endcall %}{% endif %}
+      {% else %}<span class="badge orig">key from .env / environment</span> <code>{{ r.masked }}</code>{% endif %}{% endmacro %}
+
+{# one key (MDBList): the field, then Save and test / Test / Remove side by side #}
+{% macro keyrow(r) %}
+  <div class="keyrow">
+    <p><strong>{{ r.label }}</strong><br><code class="var">{{ r.name }}</code><br>{{ keybadge(r) }}</p>
+    {% if r.editable %}
+    <form method="post" action="/settings/key" class="optform" autocomplete="off">
+      <input type="hidden" name="token" value="{{ csrf(request) }}">
+      <input type="hidden" name="name" value="{{ r.name }}">
+      <label><span class="lt">New key</span><input type="password" name="value" placeholder="{{ 'Replaces the saved one' if r.source == 'settings' else 'Overrides the environment' if r.source == 'environment' else 'Paste the key' }}"
+             required minlength="8" maxlength="200" autocomplete="new-password" spellcheck="false"></label>
+      <div class="row"><button class="btn">Save and test</button>
+        {% if r.source != "missing" %}<button class="btn plain" formaction="/settings/test" formnovalidate>Test</button>{% endif %}
+        {% if r.clearable %}<button class="btn danger" formaction="/settings/clear" formnovalidate>Remove saved key</button>{% endif %}</div>
+    </form>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% block body %}
+<h1>Settings</h1>
+{% if note_text %}<p class="note {{ note_kind }}">{{ note_text }}{% if note_detail %} {{ note_detail }}{% endif %}</p>{% endif %}
+{% if not can_write %}<p class="note warn">Read-only: start the UI with a password to change settings.</p>{% endif %}
+
+<div class="hrow"><h2>Media servers</h2>{% call info("i-servers") %}You can connect an Emby and a Jellyfin server at the same time. Each keeps its own saved posters and restore data, so nothing
+done on one can touch the other. Values saved here override <code>config.local.yaml</code>, which is never rewritten. They are saved in:
+<code class="cmd">{{ settings_file }}</code>{% endcall %}</div>
+{% for c in cards %}
+<section class="card2">
+  <h3>{{ c.label }}
+    {% if not c.configured %}<span class="badge plain">not set up</span>
+    {% elif not c.enabled %}<span class="badge plain">switched off</span>
+    {% else %}<span class="badge {{ c.status[0] }}">{{ c.status[1] }}</span>{% endif %}</h3>
+  {% if c.warning %}<div class="hrow"><span class="muted">Not yet verified</span>{% call info("i-warn-" ~ c.kind) %}{{ c.warning }}{% endcall %}</div>{% endif %}
+  {% if can_write %}
+  <form method="post" action="/settings/server" class="serverform" autocomplete="off">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <input type="hidden" name="kind" value="{{ c.kind }}">
+    <label>Address <input name="url" value="{{ c.url }}" placeholder="http://192.168.1.10:8096" maxlength="200" spellcheck="false"></label>
+    <label><span class="lt">Library <span class="muted">(optional)</span></span>
+      <input name="library" value="{{ c.library }}" maxlength="100" list="libs-{{ c.kind }}" placeholder="All libraries">
+      <datalist id="libs-{{ c.kind }}">{% for l in c.libraries %}<option value="{{ l }}">{% endfor %}</datalist></label>
+    <input type="hidden" name="name" value="{{ c.key.name }}">
+    {% if c.key.editable %}<label><span class="lt">API key {{ keybadge(c.key) }}</span>
+      <input type="password" name="api_key" maxlength="200" autocomplete="new-password" spellcheck="false"
+             placeholder="{{ 'Leave blank to keep the current key' if c.key.source != 'missing' else 'Paste the key' }}"></label>{% endif %}
+    <label class="check"><input type="checkbox" name="enabled" value="1" {{ "checked" if c.enabled or not c.configured }}> Use this server</label>
+    <input type="hidden" name="scheduled_set" value="1">
+    <label class="check"><input type="checkbox" name="scheduled" value="1" {{ "checked" if c.scheduled }}> Include in scheduled runs</label>
+    {% if c.configured and not c.scheduled %}<p class="muted small">Not included yet, so the schedule leaves this server alone. Run <em>Apply</em> from the Library page yourself first (start with a few titles), then tick this box.</p>{% endif %}
+    <div class="row"><button class="btn">Save {{ c.label }}</button>
+      {% if c.key.source != "missing" %}<button class="btn plain" formaction="/settings/test" formnovalidate>Test</button>{% endif %}
+      {% if c.key.clearable %}<button class="btn danger" formaction="/settings/clear" formnovalidate>Remove saved key</button>{% endif %}
+      {% if c.from_settings %}<a class="btn plain" href="/settings/reset?section=server:{{ c.kind }}" title="Forget what you saved here for this server and use the config file again (asks first)">Back to config file&hellip;</a>{% endif %}</div>
+  </form>
+  {% else %}<p>Address: <code>{{ c.url or "(not set)" }}</code><br>Library: <code>{{ c.library or "(all)" }}</code></p><p>{{ keybadge(c.key) }}</p>{% endif %}
+</section>
+{% endfor %}
+
+<div class="hrow"><h2>MDBList</h2>{% call info("i-mdb") %}One MDBList key is shared by every server. Keys are never shown in full and are never sent to your browser after saving.
+  A key saved here <strong>overrides</strong> the one in <code>.env</code> or the container's environment; removing it brings that one back.
+  Saved keys live in the file below (mode 600, plain text like <code>.env</code>); include that folder in your protected backups:
+  <code class="cmd">{{ secrets_file }}</code>{% endcall %}</div>
+<section class="card2">{{ keyrow(mdb_key) }}</section>
+
+<div class="hrow"><h2>Options</h2>{% call info("i-sched") %}Scheduled checks are <strong>off until you choose a time</strong>, so nothing is applied behind your back. They run while the web UI is running, for each connected server in turn, and need a password.{% endcall %}</div>
+{% if can_write %}
+<section class="card2">
+  <form method="post" action="/settings/general" class="optform">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <div class="hrow subhead first" id="critic"><h3 class="sub">Scores</h3>{% call info("i-critic") %}<dl class="opts">
+      <dt>Off by default</dt><dd>Nothing is written to CriticRating unless you turn this on, because it changes a field on your items.</dd>
+      <dt>What it does</dt><dd>When this is on, every time a score is drawn on a poster the same score is also written to the item's <strong>CriticRating</strong> field in Emby or Jellyfin (0-100, so 7.3 becomes 73). Emby and Jellyfin show it as the critic score and can sort and filter by it.</dd>
+      <dt>Safe to use</dt><dd>The field is locked so a metadata refresh does not overwrite it, the previous value is saved, and <strong>Restore</strong> puts it back. A value you edit by hand in the server afterwards is left alone and reported.</dd>
+      <dt>When it takes effect</dt><dd>On the next apply or maintenance run. Turning it off stops further writes but does not remove values already written; use Restore (metadata) for that.</dd></dl>{% endcall %}</div>
+    <label class="check"><input type="checkbox" name="critic" value="1" {{ "checked" if critic }}> Write the score to CriticRating</label>
+    <label>Check for new or changed posters
+      <select name="changed_every_minutes">
+        {% for m in minutes_options %}<option value="{{ m }}" {{ "selected" if m == sched.changed_every_minutes }}>{{ "never" if m == 0 else "every " ~ m ~ " minutes" }}</option>{% endfor %}
+        {% if sched.changed_every_minutes not in minutes_options %}<option value="{{ sched.changed_every_minutes }}" selected>every {{ sched.changed_every_minutes }} minutes</option>{% endif %}
+      </select></label>
+    <label>Template used by scheduled runs
+      <select name="sched_template">{% for t in templates %}<option value="{{ t }}" {{ "selected" if t == sched.template }}>{{ t|tname }}</option>{% endfor %}</select></label>
+    <div class="hrow subhead"><h3 class="sub">Maintenance</h3>{% call info("i-maint") %}A film that stays missing from the server is only cleaned up after this long, and only if it is still missing then; a server or NAS that is just offline never triggers it.{% endcall %}</div>
+    <div class="row">
+      <label class="inline"><input type="checkbox" name="maint_on" value="1" {{ "checked" if sched.maintenance_day }}> Monthly full maintenance on day</label>
+      <input type="number" name="maint_day" min="1" max="28" value="{{ sched.maintenance_day or 1 }}" class="narrow">
+      <span class="muted">at</span>
+      <input type="time" name="maint_time" value="{{ sched.maintenance_time }}">
+    </div>
+    <div class="row">
+      <label>Clean up records of missing films after (days)
+        <input type="number" name="grace_days" min="7" max="365" value="{{ cleanup_limits.grace_days }}" class="narrow"></label>
+      <label>Delete trash for good after (days)
+        <input type="number" name="trash_days" min="7" max="730" value="{{ cleanup_limits.trash_days }}" class="narrow"></label>
+    </div>
+    <div class="row">
+      <button class="btn">Save options</button>
+      {% if general_saved %}<a class="btn plain" href="/settings/reset?section=general" title="Forget the options you saved here and use the config file values again (asks first)">Back to config file&hellip;</a>{% endif %}
+    </div>
+  </form>
+</section>
+{% else %}<p class="muted" id="critic">CriticRating: {{ "on" if critic else "off" }} &middot; schedule: check {{ "never" if not sched.changed_every_minutes else "every " ~ sched.changed_every_minutes ~ " min" }}</p>{% endif %}
+
+<div class="hrow" id="assets"><h2>Custom posters</h2>{% call info("i-assets-set") %}Posters you place in this folder replace the server's poster as the base laminator draws the score on (for example fan edits). Name each one after the media folder: <code>Dumbo/poster.jpg</code>. Leave the path empty to use the default folder inside laminator's data. In Docker, mount your folder as a volume and enter the path inside the container. See the Custom posters page for the full naming rules and what matches.{% endcall %}</div>
+<section class="card2">
+  {% if can_write %}
+  <form method="post" action="/settings/assets" class="optform" autocomplete="off">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <label><span class="lt">Assets folder <span class="muted">(empty = {{ assets_default }})</span></span><input name="path" value="{{ assets_value }}" placeholder="{{ assets_default }}" maxlength="500"></label>
+    <div class="row"><button class="btn">Save folder</button><a class="btn plain" href="/assets">Open the Custom posters page</a></div>
+  </form>
+  {% else %}<p>Folder: <code>{{ assets_value or assets_default }}</code></p>{% endif %}
+</section>
+
+<div class="hrow"><h2>Backup and restore</h2>{% call info("i-backup") %}A backup holds laminator's own data: each server's saved original posters and restore records (a consistent snapshot), your settings,
+  overrides, templates and fonts, with a checksum for every file. It does <strong>not</strong> contain your media server's data. API keys and the
+  password are only included if you ask, and then encrypted with a passphrase you choose (lose the passphrase and those cannot be recovered).
+  Files are in:
+  <code class="cmd">{{ settings_file | replace("settings.yaml", "backups") }}</code>{% endcall %}</div>
+<section class="card2">
+  <div class="hrow subhead first"><h3 class="sub">Schedule</h3>{% call info("i-sched-bk") %}Scheduled backups never include API keys or the password, and only scheduled ones are ever pruned: backups you made by hand or uploaded are kept.{% endcall %}</div>
+  {% if can_write %}
+  <form method="post" action="/settings/backup/schedule" class="optform">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <div class="row">
+      <label>Back up every (days; 0 = never)
+        <input type="number" name="backup_every_days" min="0" max="90" value="{{ sched.backup_every_days }}" class="narrow"></label>
+      <label>Keep the last
+        <input type="number" name="backup_keep" min="1" max="50" value="{{ sched.backup_keep }}" class="narrow"></label>
+    </div>
+    <div class="row"><button class="btn">Save schedule</button></div>
+  </form>
+  {% else %}<p class="muted">{{ "Off" if sched.backup_every_days == 0 else "Every " ~ sched.backup_every_days ~ " day(s), keeping the last " ~ sched.backup_keep }}</p>{% endif %}
+
+  <div class="hrow subhead"><h3 class="sub">Second copy</h3>{% call info("i-dest") %}Also copy each backup to a second place, so one failing disk cannot take the backups with it. Every copy is read back and compared before it counts.
+  Scheduled backups are pruned there too (only ones laminator made on a schedule). For Google Drive, OneDrive and similar, mount them as a folder (for example with rclone) and use <em>Folder</em>.{% endcall %}</div>
+  {% if dest_state.push_error %}<p class="note bad">The last copy failed: {{ dest_state.push_error }} (retrying hourly)</p>{% endif %}
+  {% if can_write %}
+  <form method="post" action="/settings/destination" class="optform" autocomplete="off" data-dest>
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <div class="field">
+      <div class="fieldhead"><label for="dest-type">Copy backups to</label>{% call info("i-desttype") %}<dl class="opts">
+        <dt>Nowhere</dt><dd>Backups stay only in this app's own data folder.</dd>
+        <dt>A folder</dt><dd>Any path inside the container: a Docker volume, or a NAS share you have mounted into it.</dd>
+        <dt>SMB share</dt><dd>Copies straight to a Windows/Samba share over the network; no mount needed.</dd></dl>{% endcall %}</div>
+      <select name="type" id="dest-type" data-dest-type>
+        <option value="none" {{ "selected" if dest.type == "none" }}>Nowhere</option>
+        <option value="local" {{ "selected" if dest.type == "local" }}>A folder</option>
+        <option value="smb" {{ "selected" if dest.type == "smb" }}>SMB share</option>
+      </select></div>
+    <div data-dest-for="local"><label><span class="lt">Folder path <span class="muted">(inside the container if you use Docker)</span></span>
+      <input name="path" value="{{ dest.path }}" placeholder="/backups"></label></div>
+    <div data-dest-for="smb">
+      <div class="row"><label>Server <input name="host" value="{{ dest.host }}" placeholder="nas.local"></label>
+        <label>Port <input name="port" type="number" value="{{ dest.port }}" class="narrow"></label>
+        <label>Share <input name="share" value="{{ dest.share }}" placeholder="Backups"></label></div>
+      <div class="row"><label>Folder on the share <input name="folder" value="{{ dest.folder }}" placeholder="laminator"></label>
+        <label>User <input name="username" value="{{ dest.username }}"></label>
+        <label><span class="lt">Domain <span class="muted">(optional)</span></span> <input name="domain" value="{{ dest.get('domain', '') }}" class="narrow"></label></div>
+      <label><span class="lt">Password <span class="muted">{{ "(saved; leave blank to keep it)" if dest_pw_set else "(not set)" }}</span></span>
+        <input name="password" type="password" autocomplete="new-password"></label>
+    </div>
+    <div class="row"><button class="btn">Save destination</button>
+      {% if dest.type != "none" %}<button class="btn plain" formaction="/settings/destination/test" formnovalidate>Test it</button>{% endif %}
+      {% if dest_saved %}<a class="btn plain" href="/settings/reset?section=destination" title="Stop copying backups to the second location (asks first)">Remove&hellip;</a>{% endif %}</div>
+  </form>
+  {% else %}<p>Destination: <code>{{ dest.type }}</code></p>{% endif %}
+
+  <div class="hrow subhead"><h3 class="sub">Backups</h3></div>
+  {% if can_write %}
+  <form method="post" action="/settings/backup/create" class="optform" autocomplete="off">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <label class="check"><input type="checkbox" name="include_secrets" value="1"> Also include API keys and the UI password (encrypted)</label>
+    <label><span class="lt">Passphrase <span class="muted">(only if the box is ticked; at least 10 characters)</span></span> <input type="password" name="passphrase" autocomplete="new-password" maxlength="200"></label>
+    <label>Passphrase again <input type="password" name="passphrase2" autocomplete="new-password" maxlength="200"></label>
+    <div class="row"><button class="btn">Create a backup now</button></div>
+  </form>
+  {% endif %}
+  <table class="stack">
+    <tr><th>Backup</th><th>Made</th><th>Size</th><th>Contents</th><th></th></tr>
+    {% for b in backups %}
+    <tr><td>{{ b.name }}</td><td>{{ b.created or "?" }}</td><td>{{ b.mb }} MB</td>
+        <td>{{ b.servers or b.problem }}{% if b.has_secrets %} <span class="badge orig">encrypted keys</span>{% endif %}</td>
+        <td class="rowacts"><a href="/backups/download/{{ b.name | urlencode }}">Download</a>
+          {% if can_write and not b.problem %}<a href="/backups/restore?name={{ b.name | urlencode }}">Restore&hellip;</a>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="5" class="muted">No backups yet.</td></tr>{% endfor %}
+  </table>
+  {% if can_write %}
+  <form method="post" action="/backups/upload" enctype="multipart/form-data" class="optform">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <label><span class="lt">Add a backup made elsewhere <span class="muted">(checked completely before it is accepted; up to {{ max_upload_mb }} MB)</span></span>
+      <input type="file" name="file" accept=".gz,.tar.gz" required></label>
+    <div class="row"><button class="btn plain">Upload</button></div>
+  </form>
+  {% endif %}
+</section>
+
+<div class="hrow" id="security"><h2>Sign-in and security</h2>{% call info("i-security") %}<dl class="opts">
+  <dt>Password</dt><dd>One password signs in to this interface. It is stored as a salted hash. Changing it signs out every other session.</dd>
+  <dt>Two-factor sign-in</dt><dd>After the password, a 6-digit code from an authenticator app (Google Authenticator, Aegis, 1Password, Bitwarden and others). Turn it on before you make laminator reachable from outside your home network.</dd>
+  <dt>Sessions</dt><dd>A sign-in lasts 12 hours, or ends after 2 hours without use. Log out ends it for real. Every sign-in, failed attempt and change here is written to the security log on the Status page.</dd></dl>{% endcall %}</div>
+<section class="card2">
+  <div class="hrow subhead first"><h3 class="sub">Password</h3></div>
+  <p>
+    {% if pw_saved %}<span class="badge ok">saved in settings</span> {% call info("i-pwstate") %}Stored as a salted hash, never the password itself{% if pw_env %}; it overrides the one in .env / the environment{% endif %}.{% endcall %}
+    {% else %}<span class="badge orig">from .env / the environment</span> <br><code class="var">LAMINATOR_ADMIN_PASSWORD</code>{% endif %}
+  </p>
+  {% if can_write %}
+  <form method="post" action="/settings/password" class="pwform" autocomplete="off">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <label>Current password <input type="password" name="current" required autocomplete="current-password"></label>
+    <label><span class="lt">New password <span class="muted">(at least {{ pw_min }} characters)</span></span> <input type="password" name="new" required minlength="{{ pw_min }}" maxlength="200" autocomplete="new-password"></label>
+    <label>New password again <input type="password" name="confirm" required minlength="{{ pw_min }}" maxlength="200" autocomplete="new-password"></label>
+    <button class="btn">Change password</button>
+  </form>
+  <div class="row"><span class="muted">Forgot it?</span>{% call info("i-pwhelp") %}On the machine running laminator, run:
+  <code class="cmd">laminator reset-password</code>
+  It removes the saved one and signs out every session{% if not pw_env %} (then set <code>LAMINATOR_ADMIN_PASSWORD</code> or the UI will not start){% endif %}.{% endcall %}</div>
+  {% if pw_saved and pw_env %}
+  <form method="post" action="/settings/password/reset"><input type="hidden" name="token" value="{{ csrf(request) }}">
+    <button class="btn danger">Remove the saved password (use the one from .env)</button></form>
+  {% endif %}
+
+  <div class="hrow subhead"><h3 class="sub">Two-factor sign-in</h3>{% call info("i-mfa") %}<dl class="opts">
+    <dt>How it works</dt><dd>After your password you enter the 6-digit code your authenticator app shows. A code works once and changes every 30 seconds.</dd>
+    <dt>Recovery codes</dt><dd>When you turn it on you get 10 one-time recovery codes: keep them somewhere safe. Each one signs you in once if you do not have your phone.</dd>
+    <dt>Locked out?</dt><dd>On the machine running laminator: <code class="cmd">laminator reset-mfa</code> turns it off and signs out every session.</dd></dl>{% endcall %}</div>
+  {% if mfa_on %}
+  <p><span class="badge ok">on</span> <span class="muted">{{ mfa_left }} recovery code{{ "" if mfa_left == 1 else "s" }} left</span></p>
+  <div class="row"><a class="btn plain" href="/settings/mfa">Manage two-factor sign-in&hellip;</a></div>
+  {% else %}
+  <p><span class="badge warn">off</span></p>
+  {% if can_write %}
+  <form method="post" action="/settings/mfa/start" class="pwform" autocomplete="off">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <label>Current password <input type="password" name="current" required autocomplete="current-password"></label>
+    <button class="btn">Set up two-factor sign-in</button>
+  </form>
+  {% endif %}
+  {% endif %}
+
+  <div class="hrow subhead"><h3 class="sub">Sessions</h3></div>
+  <p class="muted">{{ sessions | length }} signed-in session{{ "" if sessions | length == 1 else "s" }}{% if sessions %}, most recently used {{ sessions[0].seen | when }}{% endif %}.</p>
+  {% if can_write and sessions | length > 1 %}
+  <form method="post" action="/settings/sessions/end"><input type="hidden" name="token" value="{{ csrf(request) }}">
+    <button class="btn plain">Sign out all other sessions</button></form>
+  {% endif %}
+  {% else %}<p class="muted">Read-only: start the UI with a password to change it.</p>{% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Apply overrides - laminator{% endblock %}
+{% block body %}
+<div class="confirm">
+  <h1>Apply {{ n }} metadata change{{ "" if n == 1 else "s" }} on {{ srv_label }}?</h1>
+  {% if not plans %}<p class="muted">There is nothing to apply.</p>{% endif %}
+  <p>Writes these values to your {{ srv_label }} server and locks exactly those fields, so a metadata refresh cannot undo them. The old values are saved first
+  (<code>restore</code> puts them back). Each write is read back to confirm it stuck.{% if force %} <strong>You chose to overwrite values you edited in {{ srv_label }}.</strong>{% endif %}</p>
+  {% for p in plans %}
+  <section class="card2"><h3>{{ p.name }}</h3><table>
+    {% for c in p.changes if c.action != "ok" and (c.action != "hand-edit" or force) %}
+    <tr><th>{{ c.key }}</th><td><code>{{ c.old | show }}</code> &rarr; <code>{{ c.new | show }}</code></td></tr>
+    {% endfor %}</table></section>
+  {% endfor %}
+  {% if plans %}
+  <form method="post" action="/metadata/apply">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <input type="hidden" name="srv" value="{{ srv }}">
+    <input type="hidden" name="item" value="{{ item }}">
+    <input type="hidden" name="force" value="{{ '1' if force else '' }}">
+    <div class="actions"><button class="btn">Apply</button><a class="btn plain" href="/metadata?s={{ srv }}">Cancel</a></div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

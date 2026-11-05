@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 260" width="1200" height="260" role="img" aria-label="laminator">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14091f"/><stop offset="1" stop-color="#0b0714"/></linearGradient>
+    <linearGradient id="wm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#19e3ff"/><stop offset=".55" stop-color="#7a5cff"/><stop offset="1" stop-color="#ff2bd6"/></linearGradient>
+    <linearGradient id="rule" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff2bd6" stop-opacity="0"/><stop offset=".3" stop-color="#ff2bd6"/><stop offset=".65" stop-color="#7a5cff"/><stop offset="1" stop-color="#19e3ff" stop-opacity="0"/></linearGradient>
+  </defs>
+  <rect width="1200" height="260" rx="18" fill="url(#bg)"/>
+  <rect x="40" y="236" width="1120" height="3" fill="url(#rule)"/>
+  <g transform="translate(80 38) scale(2.7)"><defs>
+    <linearGradient id="p" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#19e3ff"/><stop offset=".45" stop-color="#7a5cff"/><stop offset="1" stop-color="#ff2bd6"/></linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd23f"/><stop offset="1" stop-color="#ff2bd6"/></linearGradient>
+    <linearGradient id="e" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#19e3ff"/><stop offset=".6" stop-color="#7a5cff"/><stop offset="1" stop-color="#ff2bd6"/></linearGradient>
+    <linearGradient id="sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  </defs>
+  <!-- the machine in perspective: right side, front, top -->
+  <path d="M40 48 L60 40 L60 50 L40 58 Z" fill="#0a0516" stroke="#7a5cff" stroke-width="1.6" stroke-linejoin="round"/>
+  <path d="M4 40 L40 48 L40 58 L4 50 Z" fill="#170b2b" stroke="url(#e)" stroke-width="1.8" stroke-linejoin="round"/>
+  <path d="M4 40 L24 32 L60 40 L40 48 Z" fill="#241546" stroke="url(#e)" stroke-width="1.8" stroke-linejoin="round"/>
+  <!-- feed slot, glowing -->
+  <path d="M16.6 37.2 L45.4 43.6 L47.8 42.6 L19 36.2 Z" fill="#19e3ff"/>
+  <!-- front panel: lights and a groove -->
+  <path d="M8 49.6 L20 52.3" stroke="#7a5cff" stroke-width="1.8" stroke-linecap="round"/>
+  <ellipse cx="29" cy="53.6" rx="1.7" ry="1.9" fill="#2de6a0"/>
+  <ellipse cx="34.4" cy="54.8" rx="1.7" ry="1.9" fill="#ff2bd6"/>
+  <!-- the laminated poster rising out of the slot -->
+  <g transform="matrix(.72 .16 .0778 -.711 21.2 37.6)">
+    <rect x="-.6" y="-.6" width="31.2" height="37.2" rx="2.2" fill="url(#p)" stroke="#fff" stroke-opacity=".8" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+    <circle cx="15" cy="23" r="8" fill="url(#sun)"/>
+    <path d="M6 20.5 H24 M6.8 17.8 H23.2 M8 15.2 H22" stroke="#241546" stroke-width="1.2"/>
+    <path d="M0 11 L8 15 L15 11 L23 15.5 L30 11 V0 H0 Z" fill="#150a2b" opacity=".85"/>
+    <path d="M0 36 H30 L0 14 Z" fill="url(#sh)"/>
+    <rect x="17.5" y="2.2" width="10.5" height="6" rx="1.4" fill="#0b0714" stroke="#19e3ff" stroke-width="1" vector-effect="non-scaling-stroke"/>
+    <path d="M19.7 5.2 H25.8" stroke="#19e3ff" stroke-width="1.4" stroke-linecap="round"/>
+  </g>
+</g>
+  <text x="300" y="148" font-family="Impact, 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif" font-size="104" letter-spacing="14" fill="url(#wm)">LAMINATOR</text>
+  <text x="304" y="196" font-family="'Courier New', Menlo, Consolas, monospace" font-size="22" letter-spacing="5" fill="#9a8fb8">SHIELD THE SURFACE. ELEVATE THE FINISH.</text>
+</svg>

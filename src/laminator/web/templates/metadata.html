@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}Metadata overrides - laminator{% endblock %}
+{% block body %}
+<div class="hrow">
+  <h1>Metadata overrides{% if srv_label %} <span class="muted">on {{ srv_label }}</span>{% endif %}</h1>
+  {% call info("i-metadata") %}<dl class="opts">
+    <dt>What this page is for</dt><dd>Change fields on items that already exist in {{ srv_label or "your server" }} (a different content rating, a sort title, an original title, a description) from a file you keep, <code>overrides.yaml</code>, instead of editing each item by hand. The file is yours: laminator never changes it unless you save it in the editor or add an override from an item's page.</dd>
+    <dt>How it works</dt><dd><strong>1.</strong> Add an override (on an item's page, or in the editor). <strong>2.</strong> This page shows what it would change, field by field, and writes nothing. <strong>3.</strong> You review and apply: the old value is saved, the new one is written, <em>exactly those fields are locked</em> so a metadata refresh in the server cannot undo them, and every write is read back to prove it stuck. <strong>4.</strong> Restore puts the old values back and removes the locks.</dd>
+    <dt>Which items an override matches</dt><dd>By IMDb, TMDb or TVDB id (survives renames and rescans), or by library plus title and year. An entry can be limited to one server with <code>server: emby</code> or <code>server: jellyfin</code>.</dd>
+    <dt>The file</dt><dd><code>{{ file }}</code></dd></dl>{% endcall %}
+</div>
+{% if note_text %}<p class="note {{ note_kind }}">{{ note_text }}{% if note_detail %} {{ note_detail }}{% endif %}</p>{% endif %}
+<div class="actions">
+  {% if can_write %}<div class="fieldhead act"><a class="btn plain" href="/metadata/edit">Edit overrides.yaml</a>
+    {% call info("i-act-edit", "act") %}<dl class="opts"><dt>What it does</dt><dd>Opens the file in a text editor, so your comments and layout stay exactly as you type them. The file is checked when you save: nothing invalid is ever written, and your text stays in the box if there is a mistake. The version it replaces is kept so you can go back.</dd></dl>{% endcall %}</div>{% endif %}
+  {% if can_write and n_writes %}<div class="fieldhead act"><a class="btn" href="/metadata/confirm?s={{ srv }}">Review and apply {{ n_writes }} change{{ "" if n_writes == 1 else "s" }}&hellip;</a>
+    {% call info("i-act-apply", "act") %}<dl class="opts"><dt>What it does</dt><dd>Shows a confirmation page first, then writes every pending change below to {{ srv_label or "the server" }}: the old value is backed up, the new value is written together with a lock on that field, and the item is read back to confirm it kept the value. Conflicts are skipped.</dd></dl>{% endcall %}</div>{% endif %}
+  {% if can_write %}<div class="fieldhead act"><a class="btn danger" href="/confirm?action=restore&scope=all&what=meta&s={{ srv }}">Restore all metadata&hellip;</a>
+    {% call info("i-act-restore", "act") %}<dl class="opts"><dt>What it does</dt><dd>Puts back the value every overridden field had before laminator changed it, and removes the locks it added (including CriticRating, if you turned that on in Settings). Values you have edited by hand in {{ srv_label or "the server" }} since are reported and left alone. Poster overlays are not touched here.</dd></dl>{% endcall %}</div>{% endif %}
+</div>
+{% if error %}<p class="note bad">{{ error }} {% if can_write %}<a href="/metadata/edit">Open the editor.</a>{% endif %}</p>
+{% elif not plans %}
+<p class="muted">{% if has_file %}No overrides apply to {{ srv_label }}.{% else %}There is no <code>overrides.yaml</code> yet.{% endif %}
+  Add one from any item's page (<em>Add an override</em>), or write the file in the editor.</p>
+{% else %}
+<div class="hrow"><h2>Planned changes</h2>
+  {% call info("i-badges") %}<dl class="opts">
+    <dt>Fields</dt><dd><code>rating</code> the content rating (a name your server knows), <code>title</code>, <code>sort_title</code>, <code>original_title</code>, <code>overview</code> (the description), <code>tagline</code>, <code>critic_rating</code> (0-100; a value you set here replaces the automatic one), and the lists <code>tags</code>, <code>genres</code> and <code>studios</code>. Poster-only settings (score, template, source, no overlay) are not listed here because they change nothing on the server.</dd>
+    <dt>Each line reads <code>current &rarr; new</code></dt><dd>The value in {{ srv_label or "the server" }} now, and what the file wants.</dd>
+    <dt><span class="badge orig">will change</span></dt><dd>The value differs (or the file's value was changed since you last applied) and will be written and locked.</dd>
+    <dt><span class="badge orig">lock missing</span></dt><dd>The value is already right, but the field is not locked in {{ srv_label or "the server" }}, so a metadata refresh could change it. Applying adds the lock and writes nothing else. If this appears for items you already applied, something in {{ srv_label or "the server" }} removed the locks after the apply.</dd>
+    <dt><span class="badge ok">already set</span></dt><dd>Already correct and locked. Nothing to do.</dd>
+    <dt><span class="badge orig">reverted by the server</span></dt><dd>laminator wrote this value before, but the server has since put the original value back (for example after a metadata refresh). Applying writes it again.</dd>
+    <dt><span class="badge warn">conflict</span></dt><dd>This field was edited manually in {{ srv_label or "the server" }} after laminator last wrote it. It is left unchanged. <em>Overwrite manual edits</em> on that item replaces the manual value with the one in the file, after a confirmation.</dd>
+    <dt>Per item</dt><dd><em>Apply only this item</em> limits the write to that one item.</dd></dl>{% endcall %}
+</div>
+<div class="stats">
+  <div class="stat"><span class="num">{{ n_items }}</span><span class="lbl">item{{ "" if n_items == 1 else "s" }}</span></div>
+  <div class="stat accent"><span class="num">{{ n_writes }}</span><span class="lbl">field{{ "" if n_writes == 1 else "s" }} to write</span></div>
+  <div class="stat {{ 'warn' if n_conflicts else '' }}"><span class="num">{{ n_conflicts }}</span><span class="lbl">conflict{{ "" if n_conflicts == 1 else "s" }}</span></div>
+</div>
+<div class="bar planfilter" id="plan-filter">
+  <input type="search" id="pf-q" placeholder="Search title, field or value" aria-label="Search the planned changes" autocomplete="off">
+  <select id="pf-status" aria-label="Filter by status">
+    <option value="">Any status</option><option value="change">Will change</option><option value="lock">Lock missing</option><option value="set">Already set</option>
+    <option value="reverted">Reverted by the server</option><option value="conflict">Conflict</option><option value="error">Problem with the entry</option>
+  </select>
+  <select id="pf-field" aria-label="Filter by field">
+    <option value="">Any field</option>{% for f in field_names %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+  </select>
+  <button type="button" class="btn plain" id="pf-reset" hidden>Reset</button>
+  <span class="muted" id="pf-count" aria-live="polite"></span>
+</div>
+<p class="muted" id="pf-none" hidden>No planned change matches.</p>
+{% for row in rows %}{% set p = row.p %}
+<section class="card2 plan" data-search="{{ row.search }}" data-status="{{ row.status }}" data-fields="{{ row.fields }}">
+  <h3>{% if p.item_id %}<a href="/item/{{ p.item_id }}?s={{ srv }}">{{ p.name }}</a>{% else %}{{ p.name }}{% endif %}</h3>
+  {% if p.error %}<p class="note bad">{{ p.error }}</p>
+  {% else %}
+  <table>
+    {% for c in p.changes %}
+    <tr>
+      <th>{{ c.key }}</th>
+      <td>{% if c.action == "ok" %}<code>{{ c.new | show }}</code>{% else %}<code>{{ c.old | show }}</code> &rarr; <code>{{ c.new | show }}</code>{% endif %}</td>
+      <td>{% if c.action == "ok" %}<span class="badge ok">already set</span>
+          {% elif c.action == "hand-edit" %}<span class="badge warn">conflict</span> <span class="muted">edited in {{ srv_label }}; left alone</span>
+          {% elif c.action == "reapply" %}<span class="badge orig">reverted by the server</span>
+          {% elif c.action == "lock" %}<span class="badge orig">lock missing</span> <span class="muted">value is right; the lock will be added</span>
+          {% else %}<span class="badge orig">will change</span>{% if c.note and "cannot lock" in c.note %} <span class="muted">{{ c.note }}</span>{% endif %}{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if can_write %}<div class="actions">
+    {% if p.writes %}<a class="btn plain" href="/metadata/confirm?s={{ srv }}&item={{ p.item_id }}">Apply only this item&hellip;</a>{% endif %}
+    {% if p.changes | selectattr("action", "equalto", "hand-edit") | list %}<a class="btn danger" href="/metadata/confirm?s={{ srv }}&item={{ p.item_id }}&force=1">Overwrite manual edits in {{ srv_label }}&hellip;</a>{% endif %}
+  </div>{% endif %}
+  {% endif %}
+</section>
+{% endfor %}
+{% endif %}
+{% if absent %}
+<details class="card2 absent">
+  <summary>{{ absent | length }} override{{ "" if absent | length == 1 else "s" }} for titles that are not on {{ srv_label }}</summary>
+  <p class="muted">These titles are only in {{ absent_label }}, so nothing happens here for them. This is fine when the two servers do not hold the same titles; each entry is applied wherever its title exists. An entry that matches no server at all is shown above as a problem instead.</p>
+  <ul class="plain">{% for p in absent %}<li><code>{{ p.name }}</code> <span class="muted">(on {{ absent_label }})</span></li>{% endfor %}</ul>
+</details>
+{% endif %}
+{% endblock %}

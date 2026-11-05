@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "_ui.html" import info %}
+{% block title %}Two-factor sign-in - laminator{% endblock %}
+{% block body %}
+<p><a href="/settings#security">&larr; Settings</a></p>
+<h1>Two-factor sign-in</h1>
+{% if error %}<p class="note bad">{{ error }}</p>{% endif %}
+{% if state == "setup" %}
+<section class="card2 mfa">
+  <div class="hrow subhead first"><h3 class="sub">1. Scan this with your authenticator app</h3></div>
+  <div class="mfa-setup">
+    <img class="qr" src="{{ qr }}" alt="QR code for your authenticator app">
+    <div>
+      <p class="muted">No camera? Add an account by hand with this key (time-based, 6 digits, 30 seconds):</p>
+      <code class="cmd">{{ key }}</code>
+    </div>
+  </div>
+  <div class="hrow subhead"><h3 class="sub">2. Enter the code it shows</h3></div>
+  <form method="post" action="/settings/mfa/confirm" class="pwform" autocomplete="off">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <label>Code <input name="code" required autocomplete="one-time-code" inputmode="numeric" maxlength="8" spellcheck="false" autofocus></label>
+    <button class="btn">Turn on two-factor sign-in</button>
+  </form>
+  <p class="muted">Nothing changes until the code is accepted. This setup expires after an hour.</p>
+</section>
+{% elif state == "codes" %}
+<section class="card2 mfa">
+  {% if fresh %}<p class="note ok">Two-factor sign-in is on. Every other session was signed out.</p>{% endif %}
+  <div class="hrow subhead first"><h3 class="sub">Your recovery codes</h3></div>
+  <p>Each code signs you in <strong>once</strong> when you do not have your phone. <strong>They are shown only now</strong>: save them in your password manager or print them.</p>
+  <ul class="codes">{% for c in codes %}<li><code>{{ c }}</code></li>{% endfor %}</ul>
+  <div class="row"><a class="btn" href="/settings#security">I have saved them</a></div>
+</section>
+{% else %}
+<section class="card2 mfa">
+  <p><span class="badge ok">on</span> <span class="muted">{{ left }} recovery code{{ "" if left == 1 else "s" }} left</span></p>
+  <div class="hrow subhead"><h3 class="sub">New recovery codes</h3>{% call info("i-newcodes") %}Makes 10 new recovery codes; the old ones stop working. Needs your password and a current code.{% endcall %}</div>
+  <form method="post" action="/settings/mfa/recovery" class="pwform" autocomplete="off">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <label>Current password <input type="password" name="current" required autocomplete="current-password"></label>
+    <label>Code from your app <input name="code" required autocomplete="one-time-code" inputmode="numeric" maxlength="20" spellcheck="false"></label>
+    <button class="btn plain">Make new recovery codes</button>
+  </form>
+  <div class="hrow subhead"><h3 class="sub">Turn it off</h3>{% call info("i-mfaoff") %}Signing in then needs only the password. Needs your password and a current code (or a recovery code), and signs out every other session.{% endcall %}</div>
+  <form method="post" action="/settings/mfa/disable" class="pwform" autocomplete="off">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <label>Current password <input type="password" name="current" required autocomplete="current-password"></label>
+    <label>Code from your app, or a recovery code <input name="code" required autocomplete="one-time-code" maxlength="20" spellcheck="false"></label>
+    <button class="btn danger">Turn off two-factor sign-in</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

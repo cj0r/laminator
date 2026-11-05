@@ -1,0 +1,11 @@
+# An allowlist: only what the image build needs goes into the build context, so nothing from a working
+# folder (settings, saved keys, state, backups, caches) can end up in an image by accident.
+*
+!src/
+!requirements.txt
+!pyproject.toml
+!README.md
+!LICENSE
+!THIRD_PARTY_NOTICES.md
+**/__pycache__/
+**/*.pyc

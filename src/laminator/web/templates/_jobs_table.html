@@ -1,0 +1,10 @@
+<div id="runs" hx-get="/jobs/table" hx-trigger="every {{ 2 if active else 8 }}s" hx-swap="outerHTML">
+<table class="stack">
+  <tr><th>Run</th><th>Status</th><th>Lines</th><th>Started</th></tr>
+  {% for j in jobs %}
+  <tr><td><a href="/jobs/{{ j.id }}">{{ j.title }}</a></td>
+      <td><span class="badge {{ 'warn' if j.status == 'running' else 'bad' if j.status == 'failed' else 'plain' if j.status in ('queued', 'cancelled') else 'ok' }}">{{ j.status }}</span></td>
+      <td>{{ j.events | length }}</td><td class="muted">{{ j.started | when }}</td></tr>
+  {% else %}<tr><td colspan="4" class="muted">No runs since the UI started.</td></tr>{% endfor %}
+</table>
+</div>

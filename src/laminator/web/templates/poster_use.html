@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Use this poster - laminator{% endblock %}
+{% block body %}
+<div class="confirm">
+  <h1>Use this {{ c.label }} poster for {{ it.name }}?</h1>
+  <p><img class="preview" src="/posters/preview/{{ it.id }}/{{ c.cid }}?s={{ srv }}" alt="preview with overlay"></p>
+  <p>{{ c.width }}&times;{{ c.height }}{% if c.language %} &middot; {{ c.language }}{% endif %}{% if c.rating_type == "Score" and c.rating %} &middot; &#9733; {{ "%.1f"|format(c.rating) }} ({{ c.votes }} votes){% elif c.rating %} &middot; &#9829; {{ c.rating | int }} likes{% endif %}</p>
+  <p class="warnbox">This replaces the poster on {{ srv_label }}. Your current poster is saved first as the original{% if managed %} (it already is){% endif %}, so it is not lost; then the score overlay is applied to the new one.
+  Nothing else about the item changes. {{ srv_label }} fetches the image itself.</p>
+  <form method="post" action="/posters/use">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <input type="hidden" name="srv" value="{{ srv }}">
+    <input type="hidden" name="item" value="{{ it.id }}">
+    <input type="hidden" name="cid" value="{{ c.cid }}">
+    <div class="actions"><button class="btn">Use this poster</button><a class="btn plain" href="/posters/{{ it.id }}?s={{ srv }}">Cancel</a></div>
+  </form>
+</div>
+{% endblock %}

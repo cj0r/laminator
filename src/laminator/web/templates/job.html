@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ job.title }} - laminator{% endblock %}
+{% block body %}
+<p><a href="/jobs">&larr; Runs</a></p>
+<h1>{{ job.title }}</h1>
+{% include "_joblog.html" %}
+{% endblock %}
