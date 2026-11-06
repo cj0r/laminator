@@ -348,8 +348,8 @@ footer.foot { text-align:left; letter-spacing:0; text-transform:none; padding:22
 .support-link.bmac, .support-link.kofi { color:var(--muted); border-color:var(--line); }
 .support-link.bmac:hover { color:#e8d56a; border-color:rgba(255,221,0,.35); background:rgba(255,221,0,.05); box-shadow:none; }
 .support-link.kofi:hover { color:#f08a8a; border-color:rgba(241,97,97,.4); background:rgba(241,97,97,.05); box-shadow:none; }
-/* the support section sits at the bottom right, under the tagline */
-.foot-row { justify-content:flex-end; }
+/* the footer row: the repository link on the left, the support section on the right, under the tagline */
+.foot-row { justify-content:space-between; }
 @media (max-width:760px) { .foot-row { flex-direction:column; align-items:stretch; } }
 /* short pages: the footer sits at the bottom of the window, not in the middle of it */
 body { min-height:100vh; display:flex; flex-direction:column; }

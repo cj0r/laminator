@@ -37,7 +37,7 @@ services:
       - ./data:/data
 ```
 
-The image is [`cj0r/laminator` on Docker Hub](https://hub.docker.com/r/cj0r/laminator) (`linux/amd64` and `linux/arm64`; tags `latest`, `0`, `0.3` and exact versions such as `0.3.0`), also on `ghcr.io/cj0r/laminator`.
+The image is [`cj0r/laminator` on Docker Hub](https://hub.docker.com/r/cj0r/laminator) (`linux/amd64` and `linux/arm64`; tags `latest`, `0`, `0.3` and exact versions such as `0.3.1`), also on `ghcr.io/cj0r/laminator`.
 
 Run `docker compose up -d`, open `http://<host>:5264`, and choose your password (the setup code is in `docker logs laminator`). Then add your server and MDBList key in **Settings**. Unraid and other setups are in [Getting started](docs/getting-started.md).
 

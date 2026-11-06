@@ -545,15 +545,15 @@ def test_save_test_and_remove_share_one_row_on_the_server_card_and_still_work(se
     assert r.status_code == 303 and "API_EMBY" not in os.environ and not (data / "secrets.env").read_text().count("API_EMBY=")
 
 
-def test_the_footer_offers_the_ways_to_support_it_and_no_link_to_the_unpublished_repository(web):
+def test_the_footer_links_to_the_public_repository_and_the_ways_to_support_it(web):
     _, c = web
     login(c)
     page = c.get("/library").text
-    for href in ("https://www.buymeacoffee.com/cj0r", "https://ko-fi.com/cj000r"):
+    for href in ("https://github.com/cj0r/laminator", "https://www.buymeacoffee.com/cj0r", "https://ko-fi.com/cj000r"):
         assert f'href="{href}"' in page, href
-    assert "github.com" not in page and "GitHub" not in page                                                # the repository is not public yet
-    assert page.count('rel="noopener noreferrer"') == 2 and page.count('target="_blank"') == 2             # new tab, no access to this page
-    assert "Buy Me A Coffee" in page and "Ko-fi" in page and "Support development" in page
+    assert "laminator-dev" not in page                                                                     # never the private repository
+    assert page.count('rel="noopener noreferrer"') == 3 and page.count('target="_blank"') == 3             # new tab, no access to this page
+    assert "GitHub Repository" in page and "Buy Me A Coffee" in page and "Ko-fi" in page and "Support development" in page
     assert "https://ko-fi.com/cj000r" in c.get("/settings").text                                            # on every page, not just the library
 
 

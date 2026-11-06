@@ -19,7 +19,7 @@ services:
       - ./data:/data                    # settings, saved original posters, state, backups: BACK THIS UP
       # - ./assets:/assets                            # custom base posters (Settings > Custom posters > folder: /assets)
       # - /mnt/disk2/laminator-backups:/backups      # optional: keep the backups on another disk (then choose /backups in Settings, or set LAMINATOR_BACKUP_DIR=/backups below)
-      # - /mnt/nas/laminator-copy:/backups-copy       # optional second backup copy
+      # - /mnt/nas/laminator-copy:/backups-secondary       # optional second backup copy
     user: "1000:1000"                   # the user and group that own ./data (run `id` to find yours); on Unraid: "99:100" (nobody:users)
     # The image is hardened on its own (unprivileged, no capabilities, no setuid programs, cannot change its own files).
     # Optional extra belt and braces, if you like them:

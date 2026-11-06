@@ -2,6 +2,11 @@
 
 Versions follow [semantic versioning](https://semver.org). Docker images are tagged `latest` (the newest release), `<version>`, `<major>.<minor>` and `<major>` (for a release tag such as `v0.2.0`), and `dev` (the latest test build from the development repository).
 
+## 0.3.1 (2026-11-06)
+
+### Changed
+- The footer links to the GitHub repository again, now that it is public.
+
 ## 0.3.0 (2026-11-06)
 
 ### Added

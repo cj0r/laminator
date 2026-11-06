@@ -34,3 +34,7 @@ Nothing is required: pull the new image and recreate the container. Settings, po
 
 - Backups stay in `<data>/backups` unless you choose another folder (Settings > Backup and restore > Backup folder, or `LAMINATOR_BACKUP_DIR`). To keep them on another disk, mount a volume and enter its path inside the container; the page offers to move existing backups there (each is checked with SHA-256 before the old copy is removed).
 - If you pin `0.2`, switch to `0.3` (or `0`) to get this and later releases.
+
+## From 0.3.0 to 0.3.1
+
+Nothing to do. 0.3.1 only adds the GitHub link back to the footer; pull the new image and recreate the container.
