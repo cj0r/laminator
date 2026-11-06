@@ -54,8 +54,8 @@ var leaving = false;
 function fieldPairs(form) {
   var out = [];
   new FormData(form).forEach(function (v, k) {
-    var el = form.elements[k];
-    var type = el && (el.type || (el.length && el[0].type));
+    var el = form.elements.namedItem(k);  // not elements[k]: a field called "item" would give the item() method
+    var type = el && (el.type || (el.length && el[0] && el[0].type));
     if (type === "hidden" || k === "token" || typeof v !== "string") return;
     out.push(k + "=" + v);
   });
@@ -201,4 +201,14 @@ if ("IntersectionObserver" in window && window.htmx) {
   if (reset) reset.addEventListener("click", function () { q.value = ""; st.value = ""; fl.value = ""; apply(); q.focus(); });
   ["input", "change"].forEach(function (ev) { q.addEventListener(ev, apply); st.addEventListener(ev, apply); fl.addEventListener(ev, apply); });
   apply();
+})();
+
+// A note that belongs to a form (a refused save, a result) sits next to that form; bring it into view, however the page was reached.
+(function () {
+  var n = document.querySelector(".note[data-focus]");
+  if (!n) { return; }
+  var go = function () { n.scrollIntoView({ block: "center" }); try { n.focus(); } catch (err) { /* ignore */ } };
+  go();
+  window.addEventListener("load", go);  // again once images have set the page's height
+  window.setTimeout(go, 300);           // and once more after the first paint, in case the browser restored a scroll position meanwhile
 })();

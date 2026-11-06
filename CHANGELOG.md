@@ -2,6 +2,22 @@
 
 Versions follow [semantic versioning](https://semver.org). Docker images are tagged `latest` (the newest release), `<version>`, `<major>.<minor>` and `<major>` (for a release tag such as `v0.2.0`), and `dev` (the latest test build from the development repository).
 
+## 0.3.0 (2026-11-06)
+
+### Added
+- **Copies of one title are shown together in the Library.** A movie or show that appears more than once in a library (an HD and a UHD folder) is one poster with a "2 copies" badge, with a Copies together / Each copy switch (remembered). Nothing is merged on the server: each copy keeps its own poster, state and custom poster. The title page lists the copies and can apply to, or restore, all of them at once; the Library's counts and "Apply to these N titles" count every copy. Copies are items of the same type sharing an IMDb, TMDb or TVDB id; items without an id are never grouped.
+- **The Custom posters page has the Library's views.** Posters, compact and list (the same choice as the Library's), search by title, library or file name, a status filter with counts (in use, waiting, unusable, not matched) and paging. Every view shows the poster file itself with its title, library, file and status, and files that match no title are listed in the same views. Thumbnails are made from the files in the assets folder, cached, and only files inside that folder are ever served; an unreadable file shows a placeholder tile.
+- **Choose where the primary backups are kept.** Settings > Backup and restore > Backup folder (or the `LAMINATOR_BACKUP_DIR` environment variable) sets a folder other than `<data>/backups`, so the backups can live on another disk or share. The folder is checked before it is saved; existing backups can be moved there (each copied, checked and only then removed from the old folder); Settings and Status show the folder, how many backups are in it and any problem; `laminator backup list` shows it too. The default is unchanged.
+
+### Changed
+- Notes and errors appear next to the form you used, and the page opens scrolled to them, instead of at the top of a long page: every Settings section has its own note slot; a refused override on a title page stays on that title with what you typed kept; a refused custom poster upload returns to the title's upload box. Copy labels drop `[imdbid-…]` tags.
+- Clearer labels: the Runs buttons (Apply overlays, Run maintenance, Clean up files, Restore originals), the Second copy menu (None, Local folder, SMB share), the backup upload and API-key options, and the Library filter menu (alphabetical; Override pending, Thumbnail (not poster), Score invalid (0.0) and others).
+- The Library filter "MDBList score missing" counts a score from any single source and leaves out titles with a manual score; "Override pending" lists only entries whose values are not on the title yet.
+
+### Fixed
+- A script error on title pages (a form field named "item") stopped the unsaved-changes warning and the scroll to a note there.
+- The two info icons on the Library opened together.
+
 ## 0.2.3 (2026-11-05)
 
 A small maintenance release; the application itself is unchanged.

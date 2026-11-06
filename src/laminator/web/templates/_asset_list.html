@@ -1,0 +1,13 @@
+{% if all_total == 0 %}<p class="muted">No poster in the folder matches a title on {{ srv_label or "this server" }} yet. Upload one from an item's page, or put files in the folder as described in the (i) above.</p>
+{% else %}
+<p class="muted">{{ total }} poster{{ "" if total == 1 else "s" }}{% if filtered %} of {{ all_total }} &middot; <a href="/assets?{{ reset }}">clear the search and filter</a>{% endif %}{% if pages > 1 %} &middot; page {{ page_no }} of {{ pages }}{% endif %}</p>
+{% if view == "list" %}<div class="lrows">{% include "_asset_cards.html" %}</div>
+{% else %}<div class="grid assetgrid {{ 'compact' if view == 'compact' else '' }}">{% include "_asset_cards.html" %}</div>{% endif %}
+{% if not rows %}<p class="muted">Nothing matches.</p>{% endif %}
+{% if pages > 1 %}
+<div class="pager">
+  {% if page_no > 1 %}<a href="/assets?{{ base }}&page_no={{ page_no - 1 }}">Previous</a>{% endif %}
+  {% if page_no < pages %}<a href="/assets?{{ base }}&page_no={{ page_no + 1 }}">Next</a>{% endif %}
+</div>
+{% endif %}
+{% endif %}

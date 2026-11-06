@@ -8,18 +8,18 @@
 </div>
 {% if can_write %}
 <div class="actions">
-  <div class="fieldhead act"><a class="btn" href="/confirm?action=apply&scope=all&s={{ srv }}">Apply to everything{% if srv_label %} on {{ srv_label }}{% endif %}&hellip;</a>
+  <div class="fieldhead act"><a class="btn" href="/confirm?action=apply&scope=all&s={{ srv }}" title="Put the score badge on every poster{% if srv_label %} on {{ srv_label }}{% endif %}">Apply overlays&hellip;</a>
     {% call info("i-act-apply", "act") %}<dl class="opts">
       <dt>What it does</dt><dd>Puts the score badge on every poster in every library of {{ srv_label or "the server" }}. For each film or show it keeps the untouched original poster (saved the first time), looks up the score from MDBList, draws it on that original with the chosen template (never on top of an earlier badge), and uploads the result. A normal metadata refresh in the server leaves it in place. If you turned it on in Settings, the same score is also written to the item's CriticRating.</dd>
       <dt>Safe to repeat</dt><dd>Items whose original, score and template are unchanged are skipped, so running it again only redraws what changed. A poster you picked yourself in the server is noticed and adopted as the new original, and an overlay that a "replace all images" refresh wiped is redrawn.</dd></dl>{% endcall %}</div>
-  <div class="fieldhead act"><a class="btn" href="/confirm?action=maintain&scope=all&s={{ srv }}">Run full maintenance now{% if srv_label %} on {{ srv_label }}{% endif %}&hellip;</a>
+  <div class="fieldhead act"><a class="btn" href="/confirm?action=maintain&scope=all&s={{ srv }}" title="The monthly pass by hand{% if srv_label %} on {{ srv_label }}{% endif %}">Run maintenance&hellip;</a>
     {% call info("i-act-maint", "act") %}<dl class="opts">
       <dt>What it does</dt><dd>The same pass that runs by itself once a month. First an apply to everything (so scores, template changes and metadata overrides are all brought up to date), then a short summary, then a clean-up.</dd>
       <dt>The clean-up part</dt><dd>Removes saved posters and records of films that stayed missing from the server past the grace period, orphan files nothing refers to, and old caches and exports. Anything that could matter goes to the trash first, where you can restore it.</dd></dl>{% endcall %}</div>
-  <div class="fieldhead act"><a class="btn plain" href="/cleanup?s={{ srv }}">Clean up&hellip;</a>
+  <div class="fieldhead act"><a class="btn plain" href="/cleanup?s={{ srv }}" title="Review what laminator no longer needs">Clean up files&hellip;</a>
     {% call info("i-act-clean", "act") %}<dl class="opts">
       <dt>What it does</dt><dd>Opens a page that shows exactly what laminator no longer needs (records of films removed from the library, orphan files, old caches) and how much space it takes. Nothing is removed until you confirm there, and a server or NAS that is merely offline never counts as "removed".</dd></dl>{% endcall %}</div>
-  <div class="fieldhead act"><a class="btn danger" href="/confirm?action=restore&scope=all&what=all&s={{ srv }}">Restore everything{% if srv_label %} on {{ srv_label }}{% endif %}&hellip;</a>
+  <div class="fieldhead act"><a class="btn danger" href="/confirm?action=restore&scope=all&what=all&s={{ srv }}" title="Put back every original poster and metadata value{% if srv_label %} on {{ srv_label }}{% endif %}">Restore originals&hellip;</a>
     {% call info("i-act-restore", "act") %}<dl class="opts">
       <dt>What it does</dt><dd>Undoes everything laminator changed on {{ srv_label or "the server" }}: every original poster is uploaded back (the score badges disappear), and every metadata value it overrode, including CriticRating, goes back to what it was, with the locks it added removed.</dd>
       <dt>What it leaves alone</dt><dd>A metadata value you edited by hand in the server afterwards is reported, not overwritten. You get a confirmation page first.</dd></dl>{% endcall %}</div>

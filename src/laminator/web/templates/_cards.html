@@ -2,7 +2,7 @@
 <a class="lrow" {% if c.anchor %}id="letter-{{ 'num' if c.anchor == '#' else c.anchor }}"{% endif %} href="/item/{{ c.it.id }}?s={{ srv }}">
   <img loading="lazy" decoding="async" width="300" height="450" src="/img/{{ c.it.id }}/thumb?s={{ srv }}&v={{ c.it.poster_tag or 'none' }}" alt="">
   <span class="lname"><strong>{{ c.it.name }}</strong> <span class="muted">{{ c.it.year or "" }}</span></span>
-  <span class="lbadges"><span class="badge {{ c.cls }}" title="{{ c.state_title }}">{{ c.label }}</span>{% if c.meta %} <span class="badge changed" title="{{ c.meta_title }}">{{ c.meta }}</span>{% endif %}</span>
+  <span class="lbadges"><span class="badge {{ c.cls }}" title="{{ c.state_title }}">{{ c.label }}</span>{% if c.n > 1 %} <span class="badge copies" title="{{ c.copies_title }}">{{ c.n }} copies</span>{% endif %}{% if c.meta %} <span class="badge changed" title="{{ c.meta_title }}">{{ c.meta }}</span>{% endif %}</span>
 </a>
 {% endfor %}{% else %}{% for c in cards %}
 <a class="card" {% if c.anchor %}id="letter-{{ 'num' if c.anchor == '#' else c.anchor }}"{% endif %} href="/item/{{ c.it.id }}?s={{ srv }}">
@@ -11,6 +11,7 @@
     <strong>{{ c.it.name }}</strong> <span class="muted yr">{{ c.it.year or "" }}</span>
     <div class="tags">
       <span class="badge {{ c.cls }}" title="{{ c.state_title }}">{{ c.label }}</span>
+      {% if c.n > 1 %}<span class="badge copies" title="{{ c.copies_title }}">{{ c.n }} copies</span>{% endif %}
       {% if c.meta %}<span class="badge changed" title="{{ c.meta_title }}">{{ c.meta }}</span>{% endif %}
     </div>
   </div>

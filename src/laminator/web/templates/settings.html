@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_ui.html" import info %}
+{% from "_ui.html" import info, note_here with context %}
 {% block title %}Settings - laminator{% endblock %}
 
 {% macro keybadge(r) %}{% if r.source == "missing" %}<span class="badge warn">key not set</span>
@@ -27,7 +27,7 @@
 
 {% block body %}
 <h1>Settings</h1>
-{% if note_text %}<p class="note {{ note_kind }}">{{ note_text }}{% if note_detail %} {{ note_detail }}{% endif %}</p>{% endif %}
+{% if note_text and not note_at %}<p class="note {{ note_kind }}" id="note" data-focus role="{{ 'alert' if note_kind == 'bad' else 'status' }}" tabindex="-1">{{ note_text }}{% if note_detail %} {{ note_detail }}{% endif %}</p>{% endif %}
 {% if not can_write %}<p class="note warn">Read-only: start the UI with a password to change settings.</p>{% endif %}
 
 <div class="hrow"><h2>Media servers</h2>{% call info("i-servers") %}You can connect an Emby and a Jellyfin server at the same time. Each keeps its own saved posters and restore data, so nothing
@@ -39,6 +39,7 @@ done on one can touch the other. Values saved here override <code>config.local.y
     {% if not c.configured %}<span class="badge plain">not set up</span>
     {% elif not c.enabled %}<span class="badge plain">switched off</span>
     {% else %}<span class="badge {{ c.status[0] }}">{{ c.status[1] }}</span>{% endif %}</h3>
+  {{ note_here("server-" ~ c.kind) }}
   {% if c.warning %}<div class="hrow"><span class="muted">Not yet verified</span>{% call info("i-warn-" ~ c.kind) %}{{ c.warning }}{% endcall %}</div>{% endif %}
   {% if can_write %}
   <form method="post" action="/settings/server" class="serverform" autocomplete="off">
@@ -69,11 +70,12 @@ done on one can touch the other. Values saved here override <code>config.local.y
   A key saved here <strong>overrides</strong> the one in <code>.env</code> or the container's environment; removing it brings that one back.
   Saved keys live in the file below (mode 600, plain text like <code>.env</code>); include that folder in your protected backups:
   <code class="cmd">{{ secrets_file }}</code>{% endcall %}</div>
-<section class="card2">{{ keyrow(mdb_key) }}</section>
+<section class="card2">{{ note_here("mdblist") }}{{ keyrow(mdb_key) }}</section>
 
 <div class="hrow"><h2>Options</h2>{% call info("i-sched") %}Scheduled checks are <strong>off until you choose a time</strong>, so nothing is applied behind your back. They run while the web UI is running, for each connected server in turn, and need a password.{% endcall %}</div>
 {% if can_write %}
 <section class="card2">
+  {{ note_here("options") }}
   <form method="post" action="/settings/general" class="optform">
     <input type="hidden" name="token" value="{{ csrf(request) }}">
     <div class="hrow subhead first" id="critic"><h3 class="sub">Scores</h3>{% call info("i-critic") %}<dl class="opts">
@@ -112,6 +114,7 @@ done on one can touch the other. Values saved here override <code>config.local.y
 
 <div class="hrow" id="assets"><h2>Custom posters</h2>{% call info("i-assets-set") %}Posters you place in this folder replace the server's poster as the base laminator draws the score on (for example fan edits). Name each one after the media folder: <code>Dumbo/poster.jpg</code>. Leave the path empty to use the default folder inside laminator's data. In Docker, mount your folder as a volume and enter the path inside the container. See the Custom posters page for the full naming rules and what matches.{% endcall %}</div>
 <section class="card2">
+  {{ note_here("assets") }}
   {% if can_write %}
   <form method="post" action="/settings/assets" class="optform" autocomplete="off">
     <input type="hidden" name="token" value="{{ csrf(request) }}">
@@ -121,13 +124,32 @@ done on one can touch the other. Values saved here override <code>config.local.y
   {% else %}<p>Folder: <code>{{ assets_value or assets_default }}</code></p>{% endif %}
 </section>
 
-<div class="hrow"><h2>Backup and restore</h2>{% call info("i-backup") %}A backup holds laminator's own data: each server's saved original posters and restore records (a consistent snapshot), your settings,
+<div class="hrow" id="backup"><h2>Backup and restore</h2>{% call info("i-backup") %}A backup holds laminator's own data: each server's saved original posters and restore records (a consistent snapshot), your settings,
   overrides, templates and fonts, with a checksum for every file. It does <strong>not</strong> contain your media server's data. API keys and the
   password are only included if you ask, and then encrypted with a passphrase you choose (lose the passphrase and those cannot be recovered).
   Files are in:
-  <code class="cmd">{{ settings_file | replace("settings.yaml", "backups") }}</code>{% endcall %}</div>
+  <code class="cmd">{{ bk_loc.path }}</code>{% endcall %}</div>
 <section class="card2">
-  <div class="hrow subhead first"><h3 class="sub">Schedule</h3>{% call info("i-sched-bk") %}Scheduled backups never include API keys or the password, and only scheduled ones are ever pruned: backups you made by hand or uploaded are kept.{% endcall %}</div>
+  <div class="hrow subhead first"><h3 class="sub">Backup folder</h3>{% call info("i-bkloc") %}Where laminator keeps its own backups. By default that is the <code>backups</code> folder inside the data folder, which is on the same disk as the data it protects. For real protection choose a folder on another disk or share: mount it into the container and give its path as the container sees it (for example <code>/backups</code>). Backups already in the old folder are moved to the new one if you leave the box ticked (each is copied, checked and only then removed). The <em>Second copy</em> below is separate and keeps working.{% endcall %}</div>
+  {{ note_here("backup-folder") }}
+  {% if not bk_loc.ok %}<p class="note bad">{{ bk_loc.error }}</p>{% endif %}
+  <p>In use: <code>{{ bk_loc.path }}</code> <span class="muted">({{ bk_loc.count }} backup{{ "" if bk_loc.count == 1 else "s" }} there{% if bk_loc.source == "environment" %}; set by the LAMINATOR_BACKUP_DIR environment variable{% elif bk_loc.source == "default" %}; the default, inside the data folder{% endif %})</span></p>
+  {% if bk_loc.stranded %}
+  <p class="note warn">{{ bk_loc.stranded }} backup{{ "" if bk_loc.stranded == 1 else "s" }} {{ "is" if bk_loc.stranded == 1 else "are" }} still in the default folder <code>{{ bk_loc.default }}</code>, not in the folder in use.
+    {% if can_write %}<form method="post" action="/settings/backup/move" class="inline"><input type="hidden" name="token" value="{{ csrf(request) }}"><button class="btn plain">Move {{ "it" if bk_loc.stranded == 1 else "them" }} to the folder in use</button></form>{% endif %}</p>
+  {% endif %}
+  {% if can_write %}
+  <form method="post" action="/settings/backup/location" class="optform" autocomplete="off">
+    <input type="hidden" name="token" value="{{ csrf(request) }}">
+    <label><span class="lt">Folder <span class="muted">(blank: the default{% if bk_env %}, or the environment variable's folder{% endif %})</span></span>
+      <input name="path" value="{{ bk_loc.path if bk_loc.source == 'settings' else '' }}" placeholder="{{ bk_loc.default }}" maxlength="500"></label>
+    <label class="check"><input type="checkbox" name="move" value="1" checked> Move the backups from the folder in use now to this one</label>
+    <div class="row"><button class="btn">Save folder</button></div>
+  </form>
+  {% endif %}
+
+  <div class="hrow subhead"><h3 class="sub">Schedule</h3>{% call info("i-sched-bk") %}Scheduled backups never include API keys or the password, and only scheduled ones are ever pruned: backups you made by hand or uploaded are kept.{% endcall %}</div>
+  {{ note_here("backup-schedule") }}
   {% if can_write %}
   <form method="post" action="/settings/backup/schedule" class="optform">
     <input type="hidden" name="token" value="{{ csrf(request) }}">
@@ -143,18 +165,19 @@ done on one can touch the other. Values saved here override <code>config.local.y
 
   <div class="hrow subhead"><h3 class="sub">Second copy</h3>{% call info("i-dest") %}Also copy each backup to a second place, so one failing disk cannot take the backups with it. Every copy is read back and compared before it counts.
   Scheduled backups are pruned there too (only ones laminator made on a schedule). For Google Drive, OneDrive and similar, mount them as a folder (for example with rclone) and use <em>Folder</em>.{% endcall %}</div>
+  {{ note_here("backup-copy") }}
   {% if dest_state.push_error %}<p class="note bad">The last copy failed: {{ dest_state.push_error }} (retrying hourly)</p>{% endif %}
   {% if can_write %}
   <form method="post" action="/settings/destination" class="optform" autocomplete="off" data-dest>
     <input type="hidden" name="token" value="{{ csrf(request) }}">
     <div class="field">
       <div class="fieldhead"><label for="dest-type">Copy backups to</label>{% call info("i-desttype") %}<dl class="opts">
-        <dt>Nowhere</dt><dd>Backups stay only in this app's own data folder.</dd>
-        <dt>A folder</dt><dd>Any path inside the container: a Docker volume, or a NAS share you have mounted into it.</dd>
+        <dt>None</dt><dd>Backups stay only in this app's own data folder.</dd>
+        <dt>Local folder</dt><dd>Any path inside the container: a Docker volume, or a NAS share you have mounted into it.</dd>
         <dt>SMB share</dt><dd>Copies straight to a Windows/Samba share over the network; no mount needed.</dd></dl>{% endcall %}</div>
       <select name="type" id="dest-type" data-dest-type>
-        <option value="none" {{ "selected" if dest.type == "none" }}>Nowhere</option>
-        <option value="local" {{ "selected" if dest.type == "local" }}>A folder</option>
+        <option value="none" {{ "selected" if dest.type == "none" }}>None</option>
+        <option value="local" {{ "selected" if dest.type == "local" }}>Local folder</option>
         <option value="smb" {{ "selected" if dest.type == "smb" }}>SMB share</option>
       </select></div>
     <div data-dest-for="local"><label><span class="lt">Folder path <span class="muted">(inside the container if you use Docker)</span></span>
@@ -176,10 +199,11 @@ done on one can touch the other. Values saved here override <code>config.local.y
   {% else %}<p>Destination: <code>{{ dest.type }}</code></p>{% endif %}
 
   <div class="hrow subhead"><h3 class="sub">Backups</h3></div>
+  {{ note_here("backups") }}
   {% if can_write %}
   <form method="post" action="/settings/backup/create" class="optform" autocomplete="off">
     <input type="hidden" name="token" value="{{ csrf(request) }}">
-    <label class="check"><input type="checkbox" name="include_secrets" value="1"> Also include API keys and the UI password (encrypted)</label>
+    <label class="check"><input type="checkbox" name="include_secrets" value="1"> Include API keys and UI password (encrypted)</label>
     <label><span class="lt">Passphrase <span class="muted">(only if the box is ticked; at least 10 characters)</span></span> <input type="password" name="passphrase" autocomplete="new-password" maxlength="200"></label>
     <label>Passphrase again <input type="password" name="passphrase2" autocomplete="new-password" maxlength="200"></label>
     <div class="row"><button class="btn">Create a backup now</button></div>
@@ -197,7 +221,7 @@ done on one can touch the other. Values saved here override <code>config.local.y
   {% if can_write %}
   <form method="post" action="/backups/upload" enctype="multipart/form-data" class="optform">
     <input type="hidden" name="token" value="{{ csrf(request) }}">
-    <label><span class="lt">Add a backup made elsewhere <span class="muted">(checked completely before it is accepted; up to {{ max_upload_mb }} MB)</span></span>
+    <label><span class="lt">Upload a backup <span class="muted">(max {{ max_upload_mb }} MB)</span></span>
       <input type="file" name="file" accept=".gz,.tar.gz" required></label>
     <div class="row"><button class="btn plain">Upload</button></div>
   </form>
@@ -210,6 +234,7 @@ done on one can touch the other. Values saved here override <code>config.local.y
   <dt>Sessions</dt><dd>A sign-in lasts 12 hours, or ends after 2 hours without use. Log out ends it for real. Every sign-in, failed attempt and change here is written to the security log on the Status page.</dd></dl>{% endcall %}</div>
 <section class="card2">
   <div class="hrow subhead first"><h3 class="sub">Password</h3></div>
+  {{ note_here("password") }}
   <p>
     {% if pw_saved %}<span class="badge ok">saved in settings</span> {% call info("i-pwstate") %}Stored as a salted hash, never the password itself{% if pw_env %}; it overrides the one in .env / the environment{% endif %}.{% endcall %}
     {% else %}<span class="badge orig">from .env / the environment</span> <br><code class="var">LAMINATOR_ADMIN_PASSWORD</code>{% endif %}
@@ -234,6 +259,7 @@ done on one can touch the other. Values saved here override <code>config.local.y
     <dt>How it works</dt><dd>After your password you enter the 6-digit code your authenticator app shows. A code works once and changes every 30 seconds.</dd>
     <dt>Recovery codes</dt><dd>When you turn it on you get 10 one-time recovery codes: keep them somewhere safe. Each one signs you in once if you do not have your phone.</dd>
     <dt>Locked out?</dt><dd>On the machine running laminator: <code class="cmd">laminator reset-mfa</code> turns it off and signs out every session.</dd></dl>{% endcall %}</div>
+  {{ note_here("mfa") }}
   {% if mfa_on %}
   <p><span class="badge ok">on</span> <span class="muted">{{ mfa_left }} recovery code{{ "" if mfa_left == 1 else "s" }} left</span></p>
   <div class="row"><a class="btn plain" href="/settings/mfa">Manage two-factor sign-in&hellip;</a></div>
@@ -249,6 +275,7 @@ done on one can touch the other. Values saved here override <code>config.local.y
   {% endif %}
 
   <div class="hrow subhead"><h3 class="sub">Sessions</h3></div>
+  {{ note_here("sessions") }}
   <p class="muted">{{ sessions | length }} signed-in session{{ "" if sessions | length == 1 else "s" }}{% if sessions %}, most recently used {{ sessions[0].seen | when }}{% endif %}.</p>
   {% if can_write and sessions | length > 1 %}
   <form method="post" action="/settings/sessions/end"><input type="hidden" name="token" value="{{ csrf(request) }}">

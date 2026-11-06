@@ -14,10 +14,12 @@ services:
       # - LAMINATOR_PUBLIC_URL=https://laminator.example.com
       # Optional: keys can be entered in Settings instead (API_EMBY / API_JELLYFIN / API_MDBLIST, or the same with _FILE)
       - TZ=America/New_York
+      # - LAMINATOR_BACKUP_DIR=/backups                # where the primary backups go (default: <data>/backups); a folder saved in Settings wins
     volumes:
       - ./data:/data                    # settings, saved original posters, state, backups: BACK THIS UP
       # - ./assets:/assets                            # custom base posters (Settings > Custom posters > folder: /assets)
-      # - /mnt/nas/laminator-backups:/backups         # optional second backup copy
+      # - /mnt/disk2/laminator-backups:/backups      # optional: keep the backups on another disk (then choose /backups in Settings, or set LAMINATOR_BACKUP_DIR=/backups below)
+      # - /mnt/nas/laminator-copy:/backups-copy       # optional second backup copy
     user: "1000:1000"                   # the user and group that own ./data (run `id` to find yours); on Unraid: "99:100" (nobody:users)
     # The image is hardened on its own (unprivileged, no capabilities, no setuid programs, cannot change its own files).
     # Optional extra belt and braces, if you like them:

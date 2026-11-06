@@ -27,3 +27,10 @@ Nothing to do. 0.2.2 changes no behaviour; pull the new image and recreate the c
 ## From 0.2.2 to 0.2.3
 
 Nothing to do. 0.2.3 changes no behaviour; pull the new image and recreate the container.
+
+## From 0.2.3 to 0.3.0
+
+Nothing is required: pull the new image and recreate the container. Settings, posters, state and backups carry over.
+
+- Backups stay in `<data>/backups` unless you choose another folder (Settings > Backup and restore > Backup folder, or `LAMINATOR_BACKUP_DIR`). To keep them on another disk, mount a volume and enter its path inside the container; the page offers to move existing backups there (each is checked with SHA-256 before the old copy is removed).
+- If you pin `0.2`, switch to `0.3` (or `0`) to get this and later releases.

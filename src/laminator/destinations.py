@@ -1,4 +1,4 @@
-"""Where backups are copied to, besides <data>/backups: a local path (a Docker bind mount, a mounted NAS or cloud folder) or an SMB share.
+"""Where backups are copied to, besides the primary backup folder (<data>/backups unless another is chosen): a local path (a Docker bind mount, a mounted NAS or cloud folder) or an SMB share.
 
 Every copy is written as <name>.part, read back and compared (SHA-256) with the local file, and only then renamed into place, so a half-copied
 file never looks like a backup. Only scheduled backups (laminator-backup-auto-*) are ever deleted at a destination; nothing else on it is touched.

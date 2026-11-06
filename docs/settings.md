@@ -8,7 +8,7 @@ Everything can be set in **Settings**; no files need editing. Values saved there
 - **MDBList**: the API key, shared by both servers.
 - **Options**: CriticRating (off by default), how often to check for changes, the template for scheduled runs, and maintenance timing.
 - **Custom posters**: the assets folder.
-- **Backup and restore**: schedule, second copy, and backups.
+- **Backup and restore**: the backup folder, schedule, second copy, and backups.
 - **Sign-in and security**: password, two-factor sign-in, and sessions.
 
 API keys are masked and never sent back to the browser. A key saved here overrides `.env` and the environment; removing it brings the environment's key back. Optional environment variables: `API_EMBY`, `API_JELLYFIN`, `API_MDBLIST`, and `LAMINATOR_ADMIN_PASSWORD` to preset the password (each also as `NAME_FILE` for Docker secrets). You can set all of these in the app instead.
@@ -25,7 +25,7 @@ Configure both in Settings. A switcher in the header picks which server the page
 settings.yaml, secrets.env, admin.hash   settings, saved keys, the password (hashed)
 mfa.json, sessions.json, audit.log       two-factor sign-in, sessions, the security log
 overrides.yaml, templates/, fonts/, assets/
-backups/, exports/, trash/, cache/
+backups/ (or the folder you chose), exports/, trash/, cache/
 servers/emby/, servers/jellyfin/         each server's original posters and records
 ```
 

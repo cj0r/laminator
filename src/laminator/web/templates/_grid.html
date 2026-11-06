@@ -1,6 +1,6 @@
 {% if request.headers.get("HX-Request") %}<span id="resetslot" hx-swap-oob="true">{% include "_reset.html" %}</span>{% endif %}
 {% if error %}<p class="note bad">{{ srv_label }}: {{ error }}. <a href="/settings">Check Settings.</a></p>{% endif %}
-<p class="muted">{{ total }} item{{ "" if total == 1 else "s" }}{% if filters %} &middot; filter: <strong>{{ filters | join("; ") }}</strong> <a href="/library?{{ reset }}">reset filters</a>{% endif %}{% if pages > 1 and not scroll %} - page {{ page_no }} of {{ pages }}{% endif %}</p>
+<p class="muted">{{ total }} item{{ "" if total == 1 else "s" }}{% if n_items != total %} ({{ n_items }} posters: copies of one title are shown together){% endif %}{% if filters %} &middot; filter: <strong>{{ filters | join("; ") }}</strong> <a href="/library?{{ reset }}">reset filters</a>{% endif %}{% if pages > 1 and not scroll %} - page {{ page_no }} of {{ pages }}{% endif %}</p>
 {% if view == "list" %}<div class="lrows">{% include "_cards.html" %}{% if not cards %}<p class="muted">Nothing matches.</p>{% endif %}</div>
 {% else %}<div class="grid {{ 'compact' if view == 'compact' else '' }}">{% include "_cards.html" %}{% if not cards %}<p class="muted">Nothing matches.</p>{% endif %}</div>
 {% endif %}

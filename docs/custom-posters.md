@@ -15,7 +15,10 @@ Also accepted: `assets/<Library>/<folder>/poster.jpg`, `assets/<folder>.jpg`, an
 
 ## In the app
 
-- **Custom posters** (on the Library page) lists matched files, files waiting to be used, and files that match nothing. **Use custom posters now** applies them.
+- **Custom posters** (on the Library page) lists every file in the assets folder with its title, library, file and status (*in use*, *waiting for the next run*, *unusable*, or *not matched to any title*). **Use custom posters now** applies them.
+  - Choose **Posters**, **Compact** or **List**, as on the Library page (the choice is shared, and remembered). Each view shows the poster file itself, the title, the library, the file's path in the assets folder and its status.
+  - **Search** looks at the title, library and file name. The **filter** narrows by status, and shows how many files are in each. Long lists are paged (25 to 500 per page).
+  - Files that match nothing are listed too, so a misspelled folder name is easy to spot: filter by *Not matched to any title*.
 - On a title's page, **Custom base poster** uploads, replaces or removes one.
 
 The server's own poster stays in the [poster history](posters.md#poster-history). Removing a custom poster moves the file to the trash; it is never deleted. While a custom poster exists, it wins over posters chosen elsewhere.

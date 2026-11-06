@@ -366,7 +366,14 @@ def cmd_backup_restore(args) -> int:
 
 
 def cmd_backup_list(args) -> int:
-    rows = backup.list_backups(data_dir(_config(args, required=False)))
+    root = data_dir(_config(args, required=False))
+    rows = backup.list_backups(root)
+    loc = backup.location_info(root)
+    print(f"backup folder: {loc['path']}" + ("" if loc["source"] == "default" else f"  (set by {'Settings' if loc['source'] == 'settings' else 'LAMINATOR_BACKUP_DIR'})"))
+    if not loc["ok"]:
+        print(f"  problem: {loc['error']}")
+    if loc["stranded"]:
+        print(f"  {loc['stranded']} backup(s) are still in {loc['default']}; move them in Settings > Backup and restore")
     if not rows:
         print("no backups yet (laminator backup create)")
     for r in rows:

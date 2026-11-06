@@ -28,26 +28,26 @@ Update with `docker compose pull && docker compose up -d`. Your data stays in `.
 
 Add a container with:
 
-- **Repository**: `cj0r/laminator:latest` (the newest release; `cj0r/laminator:dev` is the latest test build, `cj0r/laminator:0.2.3` pins one release)
+- **Repository**: `cj0r/laminator:latest` (the newest release; `cj0r/laminator:dev` is the latest test build, `cj0r/laminator:0.3.0` pins one release)
 - **Port**: 5264 → 5264
 - **Path**: `/mnt/user/appdata/laminator` → `/data`
 
 The image runs as `99:100` (`nobody:users`), the owner Unraid gives new appdata folders, so no user setting is needed. After it starts, open the container's log (the **Logs** icon) for the setup code, then open the web UI and choose your password.
 
-Optional paths: a folder for [custom posters](custom-posters.md) at `/assets` and one for a [second backup copy](backups.md#a-second-copy) at `/backups`. Include the appdata folder in your backups.
+Optional paths: a folder for [custom posters](custom-posters.md) at `/assets`, one for the [backups](backups.md#where-backups-are-kept) themselves (choose its path in Settings, or set `LAMINATOR_BACKUP_DIR`) and one for a [second backup copy](backups.md#a-second-copy). Include the appdata folder in your backups.
 
 ## Other container managers
 
 Any tool that runs Docker images works. Create a container with:
 
-- **Image**: `cj0r/laminator:latest` (the newest release; `cj0r/laminator:dev` is the latest test build, `cj0r/laminator:0.2.3` pins one release)
+- **Image**: `cj0r/laminator:latest` (the newest release; `cj0r/laminator:dev` is the latest test build, `cj0r/laminator:0.3.0` pins one release)
 - **Port**: 5264 → 5264
 - **A persistent folder** mounted at `/data`, owned by the user the container runs as (set that user with the manager's *user* option)
 - **Time zone**: the `TZ` environment variable
 
 After it starts, open the container's log for the setup code, then open the web UI and choose your password.
 
-Optional folders: one for [custom posters](custom-posters.md) mounted at `/assets` and one for a [second backup copy](backups.md#a-second-copy) at `/backups`. Include the data folder in your backups.
+Optional folders: one for [custom posters](custom-posters.md) mounted at `/assets`, one for the [backups](backups.md#where-backups-are-kept) themselves (choose its path in Settings, or set `LAMINATOR_BACKUP_DIR`) and one for a [second backup copy](backups.md#a-second-copy). Include the data folder in your backups.
 
 ## From source
 

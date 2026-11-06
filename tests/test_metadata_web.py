@@ -104,6 +104,18 @@ def test_the_editor_validates_keeps_comments_and_can_undo(ui):
     assert (root / "overrides.yaml").read_text() == good
 
 
+def refused(r, *notes):
+    """A refused override form comes back as the title page itself (422) with what was typed and the reason INSIDE the override card, beside the form."""
+    assert r.status_code == 422, r.status_code
+    body = r.text
+    start = body.index('<details class="card2 addov"')
+    card = body[start:body.index("</details>", start)]
+    assert 'id="note"' in card and "data-focus" in card and "<form" in card and card.index('id="note"') < card.index("<form"), "the note must sit above the form, inside its card"
+    assert 'id="note"' not in body[:start]                                                   # and nowhere else on the page
+    assert " open" in body[start:start + 60]                                                  # the card is open, so the note is seen
+    return True
+
+
 def add(c, tok, **kw):
     return c.post("/metadata/add", data={"srv": "emby", "item": "1", "token": tok(), **kw})
 
@@ -119,7 +131,7 @@ def test_add_override_appends_one_correct_entry_without_touching_the_rest(ui):
     entries = metamod.parse_overrides(text)
     assert len(entries) == 2 and entries[1] == {"match": {"imdb": "tt1"}, "rating": "PG-13", "sort_title": "Elf (2003)", "score": 8.5}
     assert "server" not in entries[1]                                                      # one server configured: no restriction needed
-    assert "note=mddup" in add(c, tok, rating="R").headers["location"]                    # no second entry for the same item
+    assert refused(add(c, tok, rating="R"), "mddup")                    # no second entry for the same item
     assert len(metamod.parse_overrides((root / "overrides.yaml").read_text())) == 2
     page = c.get("/item/1").text                                                           # the entry exists now: the form edits it
     assert "Override for this item (in overrides.yaml)" in page and "Add an override for this item" not in page
@@ -139,20 +151,20 @@ def test_user_text_can_never_break_out_of_its_value(ui):
 
 def test_add_override_refuses_what_it_cannot_do_safely(ui):
     app, c, tok, root, srv = ui
-    assert "note=mdbad" in add(c, tok).headers["location"]                                # nothing filled in
+    assert refused(add(c, tok), "mdbad")                                # nothing filled in
     for kw in ({"rating": "PG-14"}, {"score": "101"}, {"score": "-1"}, {"score": "toolongtext"}, {"sort_title": "x" * 300}, {"overview": "x" * 6000}):
         r = add(c, tok, **kw)
-        assert "note=mdbad" in r.headers["location"], kw
+        assert refused(r, "mdbad"), kw
     assert not (root / "overrides.yaml").exists()
     write(root, "overrides:\n  - match: {imdb: tt9}\n    rating: R\nother_key: 1\n")             # entry would land under the wrong key
     before = (root / "overrides.yaml").read_text()
-    assert "note=mdbad" in add(c, tok, rating="PG").headers["location"] and (root / "overrides.yaml").read_text() == before
+    assert refused(add(c, tok, rating="PG"), "mdbad") and (root / "overrides.yaml").read_text() == before
     # valid YAML either way, but the new entry would land in `notes`, not `overrides`: only the post-append check catches this
     write(root, "overrides:\n  - match: {imdb: tt9}\n    rating: R\nnotes:\n  - a reminder\n")
     before = (root / "overrides.yaml").read_text()
-    assert "note=mdbad" in add(c, tok, rating="PG").headers["location"] and (root / "overrides.yaml").read_text() == before
+    assert refused(add(c, tok, rating="PG"), "mdbad") and (root / "overrides.yaml").read_text() == before
     write(root, "overrides: {not: a list}\n")
-    assert "note=mdbad" in add(c, tok, rating="PG").headers["location"]
+    assert refused(add(c, tok, rating="PG"), "mdbad")
     write(root, "overrides: []\n")                                                          # an empty flow list is converted properly
     add(c, tok, rating="PG")
     assert len(metamod.parse_overrides((root / "overrides.yaml").read_text())) == 1
@@ -226,7 +238,7 @@ def test_clearing_is_explicit_and_an_empty_box_means_no_change(ui):
     e = entries(root)[0]
     assert e["tagline"] == "" and e["overview"] == "" and e["tags"] == [] and "genres" not in e
     r = add(c, tok)                                                        # nothing filled in
-    assert "note=mdbad" in r.headers["location"] or "note=mddup" in r.headers["location"]
+    assert refused(r, "mdbad") or refused(r, "mddup")
 
 
 @pytest.mark.parametrize("data", [{"critic_rating": "101"}, {"critic_rating": "5.5"}, {"critic_rating": "abc"}, {"tags": "a", "tags_mode": "rename"},
@@ -235,7 +247,7 @@ def test_clearing_is_explicit_and_an_empty_box_means_no_change(ui):
 def test_bad_input_is_refused_and_nothing_is_written(ui, data):
     app, c, tok, root, srv = ui
     r = add(c, tok, **data)
-    assert "note=mdbad" in r.headers["location"] and not (root / "overrides.yaml").exists()
+    assert refused(r, "mdbad") and not (root / "overrides.yaml").exists()
 
 
 def test_a_written_entry_is_planned_and_applied_like_any_other(ui):
@@ -300,7 +312,7 @@ def test_item_page_shows_the_existing_override_and_saving_replaces_it(ui):
     assert text.endswith("\n\n  - match: {imdb: tt8}\n    rating: PG\n") and "# Elf" in text   # neighbours, comments and the entry's own comment kept
     es = entries(root)
     assert len(es) == 3 and es[1] == {"match": {"imdb": "tt1"}, "sort_title": "Elf", "score": 9.0} and es[0]["rating"] == "R" and es[2]["rating"] == "PG"
-    assert "note=mddup" in add(c, tok, rating="R").headers["location"]                    # still no second entry through the add path
+    assert refused(add(c, tok, rating="R"), "mddup")                    # still no second entry through the add path
 
 
 def test_editing_refuses_a_stale_or_wrong_entry_and_changes_nothing(ui):
@@ -309,7 +321,7 @@ def test_editing_refuses_a_stale_or_wrong_entry_and_changes_nothing(ui):
     before = (root / "overrides.yaml").read_text()
     for entry in ("1", "7", "-1", "x"):                                                   # not this item's entry / out of range / junk
         r = c.post("/metadata/add", data={"srv": "emby", "item": "1", "token": tok(), "entry": entry, "rating": "PG-13"})
-        assert "note=mdbad" in r.headers["location"], entry
+        assert refused(r, "mdbad"), entry
     assert (root / "overrides.yaml").read_text() == before
 
 

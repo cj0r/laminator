@@ -1,8 +1,9 @@
 {% extends "base.html" %}
-{% from "_ui.html" import info %}
+{% from "_ui.html" import info, note_here with context %}
 {% block title %}{{ it.name }} - laminator{% endblock %}
 {% block body %}
 <p><a href="/library?lib={{ lib | urlencode }}&s={{ srv }}">&larr; {{ lib }}</a></p>
+{% if note_text and not note_at %}<p class="note {{ note_kind or 'ok' }}" id="note" data-focus role="status" tabindex="-1">{{ note_text }}{% if note_detail %} {{ note_detail }}{% endif %}</p>{% endif %}
 <h1>{{ it.name }} <span class="muted">{{ it.year or "" }}</span> <span class="badge {{ cls }}">{{ label }}</span></h1>
 <div class="three">
   <figure><img src="/img/{{ it.id }}/original?s={{ srv }}" alt="original"><figcaption>Original{% if not row %} (current poster; not managed yet){% endif %}</figcaption></figure>
@@ -25,8 +26,24 @@
   {% endif %}
 </div>
 {% endif %}
+{% if copy_rows %}
+<section class="card2 copiespanel" id="copies">
+  <div class="hrow subhead first"><h3 class="sub">Copies of this title ({{ copy_rows | length }})</h3>{% call info("i-copies") %}This title is in {{ lib }} more than once, for example as an HD and a UHD copy. Each copy is a separate item on {{ srv_label }} with its own poster, so each can have its own custom poster and its own state: nothing is merged. The Library shows the copies together unless you choose <em>Each copy</em>. Open a copy to work on it alone, or apply to all of them at once.{% endcall %}</div>
+  {% for r in copy_rows %}<div class="copyrow {{ 'current' if r.current }}">
+    <img loading="lazy" decoding="async" width="300" height="450" src="/img/{{ r.it.id }}/thumb?s={{ srv }}&v={{ r.it.poster_tag or 'none' }}" alt="">
+    <span class="cname"><strong>{{ r.label }}</strong></span>
+    <span class="badge {{ r.cls }}">{{ r.state }}</span>
+    {% if not r.current %}<a class="btn plain small" href="/item/{{ r.it.id }}?s={{ srv }}">Open this copy</a>{% endif %}
+  </div>{% endfor %}
+  {% if can_write %}<div class="actions">
+    <a class="btn" href="/confirm?action=apply&scope=selection&lib={{ lib | urlencode }}&ids={{ copy_ids }}&template={{ template | urlencode }}&changed=0&s={{ srv }}">Apply overlay to all {{ copy_rows | length }} copies&hellip;</a>
+    {% if copy_rows | selectattr("managed") | list %}<a class="btn danger" href="/confirm?action=restore&scope=selection&what=scores&lib={{ lib | urlencode }}&ids={{ copy_ids }}&s={{ srv }}">Restore the original posters of all copies&hellip;</a>{% endif %}
+  </div>{% endif %}
+</section>
+{% endif %}
 {% if can_write %}
 <section class="card2" id="custom">
+  {{ note_here("custom") }}
   {% set cp = custom %}
   <div class="hrow subhead first"><h3 class="sub">Custom base poster</h3>{% call info("i-custom") %}<dl class="opts">
     <dt>What it does</dt><dd>Use your own poster for this title instead of the one {{ srv_label }} has, for example for a fan edit. laminator draws the score on <em>your</em> poster. The poster {{ srv_label }} had stays in the poster history, so you can go back.</dd>
@@ -43,9 +60,10 @@
 </section>
 {% endif %}
 {% if can_write %}
-{% set f = ov.form if ov else {} %}{% set md = ov.modes if ov else {} %}
-<details class="card2 addov"{% if ov %} open{% endif %}>
+{% set f = typed.form if typed else (ov.form if ov else {}) %}{% set md = typed.modes if typed else (ov.modes if ov else {}) %}
+<details class="card2 addov"{% if ov or typed or note_at == "override" %} open{% endif %}>
   <summary>{% if ov %}Override for this item (in overrides.yaml){% else %}Add an override for this item{% endif %}</summary>
+  {{ note_here("override") }}
   {% if ov %}<p class="note ok">This title already has an override in <code>overrides.yaml</code>. The fields below show its current values; saving replaces that entry (no second one is added).</p>{% endif %}
   <div class="hrow"><span class="muted">How this works</span>{% call info("i-addov") %}<dl class="opts">
     <dt>What it does</dt><dd>{% if ov %}Replaces this title's entry in <code>overrides.yaml</code>; every other entry and comment in the file stays as it is.{% else %}Appends one entry to <code>overrides.yaml</code> (matched by {{ "its " ~ match_label }}).{% endif %} Nothing is written to {{ srv_label }} until you review and apply it on the Metadata page. Leave a field empty to leave it alone.</dd>
@@ -79,7 +97,7 @@
     <label><span class="lt">Poster score <span class="muted">(0-100, or short text like A+)</span></span> <input name="score" maxlength="8" value="{{ f.score if f.score is not none and "score" in f else '' }}"></label>
     <label><span class="lt">Template for this title</span> <select name="template"><option value="">Default</option>{% for t in templates if t != usual_template or t == f.template %}<option value="{{ t }}"{% if t == f.template %} selected{% endif %}>{{ (t|tname) ~ (" (built-in)" if t == "default" else "") }}</option>{% endfor %}</select></label>
     <label><span class="lt">Score source for this title</span> <select name="source"><option value="">Default</option>{% for i, l in source_choices if i != usual_source or i == f.source %}<option value="{{ i }}"{% if i == f.source %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
-    <label class="check"><input type="checkbox" name="no_overlay" value="1"{% if ov and ov.no_overlay %} checked{% endif %}> No score on this title (show its poster without one)</label>
+    <label class="check"><input type="checkbox" name="no_overlay" value="1"{% if (typed.no_overlay if typed else (ov and ov.no_overlay)) %} checked{% endif %}> No score on this title (show its poster without one)</label>
     <div class="row"><button class="btn">{% if ov %}Save override{% else %}Add to overrides.yaml{% endif %}</button></div>
   </form>
 </details>

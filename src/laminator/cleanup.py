@@ -172,7 +172,8 @@ def scan_root(root: Path, now: float, lim: Limits) -> Plan:
     plan = Plan()
     plan.caches = (_old((root / "cache" / "posters").glob("*.img") if (root / "cache" / "posters").is_dir() else [], now, lim.poster_cache_days)
                    + _old((root / "cache" / "mdblist").glob("*.json") if (root / "cache" / "mdblist").is_dir() else [], now, lim.mdb_cache_days)
-                   + _old((root / "cache" / "thumbs").glob("*.jpg") if (root / "cache" / "thumbs").is_dir() else [], now, lim.poster_cache_days))
+                   + _old((root / "cache" / "thumbs").glob("*.jpg") if (root / "cache" / "thumbs").is_dir() else [], now, lim.poster_cache_days)
+                   + _old((root / "cache" / "asset-thumbs").glob("*.jpg") if (root / "cache" / "asset-thumbs").is_dir() else [], now, lim.poster_cache_days))
     plan.exports = _old((root / "exports").glob("laminator-posters-*.zip") if (root / "exports").is_dir() else [], now, lim.exports_days)
     plan.trash = _old_dirs(root / "trash", "*", now, lim.trash_days)
     if lim.safety_days:

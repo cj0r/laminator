@@ -7,7 +7,7 @@ While the web UI runs it can do two things on its own, **but only once you turn 
 - A **quick check** (off until you choose how often, in Settings, Options): new titles, changed posters, new custom posters.
 - A **monthly maintenance** pass (off until you turn it on): every title's score refreshed, then a cleanup.
 
-Scheduled runs show on the Runs page. **Run full maintenance now** does the monthly pass by hand.
+Scheduled runs show on the Runs page. **Run maintenance** does the monthly pass by hand.
 
 ## Cleanup
 

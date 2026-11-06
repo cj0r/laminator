@@ -142,7 +142,7 @@ def filt(tmp_path):
     s.put_original("2", "Bravo", str(sd / "2.img"), "sha", "t1"); s.set_applied("2", "h", "0.0", "t1", "sha3")   # an old badge reading 0.0 on Bravo
     s.meta_put("1", "Alpha", "rating", "PG", "PG-13", True)                                                   # Alpha's rating was written
     s.db.close()
-    (tmp_path / "overrides.yaml").write_text("overrides:\n  - match: {title: Delta fan edit}\n    score: 7.5\n  - match: {imdb: tt3}\n    rating: PG-13\n")
+    (tmp_path / "overrides.yaml").write_text("overrides:\n  - match: {title: Delta fan edit}\n    score: 7.5\n  - match: {imdb: tt3}\n    rating: PG-13\n  - match: {imdb: tt1}\n    rating: PG\n")
     (tmp_path / "assets" / "Bravo").mkdir(parents=True)
     Image = __import__("PIL.Image", fromlist=["Image"]); Image.new("RGB", (200, 300)).save(tmp_path / "assets" / "Bravo" / "poster.jpg")
     app = create_app({"server": {"kind": "emby", "url": "http://x"}}, srv, tmp_path, "pw", FakeMdb())
@@ -151,10 +151,10 @@ def filt(tmp_path):
 
 
 @pytest.mark.parametrize("show, expected", [
-    ("no_mdb", ["Bravo", "Charlie", "Delta fan edit", "Foxtrot"]),                  # a 0, a lookup without a combined score, no ids at all, and no ids
-    ("has_mdb", ["Alpha", "Echo"]),
+    ("no_mdb", ["Bravo", "Foxtrot"]),                                    # a 0, a lookup without a combined score; Delta fan edit has no MDBList score but a manual one, so it is not missing
+    ("has_mdb", ["Alpha", "Charlie", "Echo"]),                                     # Charlie has no combined score but IMDb and TMDb ones: the poster shows one
     ("my_score", ["Delta fan edit"]),
-    ("in_file", ["Charlie", "Delta fan edit"]),
+    ("in_file", ["Charlie"]),                                                       # Charlie: a rating not written yet. Delta: poster-only entry. Alpha: entry already written
     ("overlay", ["Bravo", "Echo"]),
     ("thumb", ["Echo"]),                                                           # Emby's image for it is landscape: a video frame, not a poster
     ("zero", ["Bravo"]),                                                           # a 0.0 badge from before a 0 meant "no score"
@@ -173,9 +173,9 @@ def test_the_library_filters_find_the_right_titles(filt, show, expected):
 
 def test_the_filter_combines_with_search_keeps_going_while_scrolling_and_can_be_cleared(filt):
     c = filt
-    assert _titles(c.get("/library?view=list&show=no_mdb&q=a").text) == ["Bravo", "Charlie", "Delta fan edit"]      # search narrows the filter
+    assert _titles(c.get("/library?view=list&show=no_mdb&q=a").text) == ["Bravo"]      # search narrows the filter
     page = c.get("/library?view=list&show=no_mdb").text
-    assert "filter: <strong>No MDBList score</strong>" in page and 'reset filters' in page and "show=" not in re.search(r'href="(/library\?[^"]+)">reset filters', page).group(1)
+    assert "filter: <strong>MDBList score missing</strong>" in page and 'reset filters' in page and "show=" not in re.search(r'href="(/library\?[^"]+)">reset filters', page).group(1)
     assert 'value="no_mdb" selected' in page and "<optgroup" in page
 
 
@@ -201,7 +201,7 @@ def test_a_filtered_list_keeps_loading_more_with_the_filter_in_the_next_request(
     ("crate=R", ["Charlie", "Foxtrot"]),
     ("crate=PG-13", ["Alpha", "Bravo"]),
     ("crate=__none__", ["Delta fan edit"]),
-    ("show=no_mdb&crate=R", ["Charlie", "Foxtrot"]),                               # filters combine
+    ("show=no_mdb&crate=R", ["Foxtrot"]),                               # filters combine
     ("show=has_mdb&smin=7.5&ymax=1980", ["Alpha"]),
     ("smin=abc&ymin=&crate=", ["Alpha", "Bravo", "Charlie", "Delta fan edit", "Echo", "Foxtrot"]),    # junk and empty values are ignored
     ("smin=-5&smax=99", ["Alpha", "Delta fan edit", "Echo"]),                      # clamped to 0-10; titles with no score are left out
@@ -213,13 +213,13 @@ def test_score_year_and_content_rating_filters(filt, query, expected):
 
 def test_the_active_filters_are_described_and_cleared_together_and_the_wording_is_neutral(filt):
     page = filt.get("/library?view=list&show=no_mdb&smin=7.5&ymax=1990&crate=R&ssrc=imdb").text
-    assert "score at least 7.5 (IMDb)" in page and "year up to 1990" in page and "content rating R" in page and "No MDBList score" in page
+    assert "score at least 7.5 (IMDb)" in page and "year up to 1990" in page and "content rating R" in page and "MDBList score missing" in page
     assert "<details class=\"morefilters\" open>" in page                                      # opened because a score, year or rating is set
     assert 'PG-13 (2)' in page and 'R (2)' in page and 'Not set (1)' in page                      # the ratings present, with counts
     clear = re.search(r'href="(/library\?[^"]+)">reset filters', page).group(1)
     assert not any(k in clear for k in ("show=", "smin", "ymax", "crate"))
     low = page.lower()
-    assert "my score" not in low and "using my" not in low and "manual score override" in low
+    assert "my score" not in low and "using my" not in low and "manual score" in low
 
 
 def test_scrolling_carries_every_filter_in_its_next_request(lib):

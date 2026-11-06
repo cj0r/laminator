@@ -106,7 +106,7 @@ def test_ui_is_read_only(web):
                        ("/settings/password/reset", "POST"), ("/settings/server", "POST"), ("/settings/reset", "POST"),
                        ("/settings/general", "POST"), ("/settings/backup/create", "POST"), ("/backups/verify", "POST"),
                        ("/backups/upload", "POST"), ("/backups/restore", "POST"), ("/metadata/edit", "POST"),
-                       ("/metadata/edit/undo", "POST"), ("/metadata/add", "POST"), ("/metadata/apply", "POST"), ("/posters/use", "POST"), ("/history/use", "POST"), ("/export/create", "POST"), ("/cleanup/run", "POST"), ("/trash/restore", "POST"), ("/settings/destination", "POST"), ("/templates/save", "POST"), ("/login/code", "POST"), ("/setup", "POST"), ("/settings/mfa/start", "POST"), ("/settings/mfa/confirm", "POST"), ("/settings/mfa/disable", "POST"), ("/settings/mfa/recovery", "POST"), ("/settings/sessions/end", "POST"), ("/templates/yaml", "POST"), ("/assets/upload", "POST"), ("/assets/remove", "POST"), ("/assets/apply", "POST"), ("/settings/assets", "POST"), ("/templates/delete", "POST"), ("/settings/backup/schedule", "POST"), ("/settings/destination/test", "POST")}
+                       ("/metadata/edit/undo", "POST"), ("/metadata/add", "POST"), ("/metadata/apply", "POST"), ("/posters/use", "POST"), ("/history/use", "POST"), ("/export/create", "POST"), ("/cleanup/run", "POST"), ("/trash/restore", "POST"), ("/settings/destination", "POST"), ("/templates/save", "POST"), ("/login/code", "POST"), ("/setup", "POST"), ("/settings/mfa/start", "POST"), ("/settings/mfa/confirm", "POST"), ("/settings/mfa/disable", "POST"), ("/settings/mfa/recovery", "POST"), ("/settings/sessions/end", "POST"), ("/templates/yaml", "POST"), ("/assets/upload", "POST"), ("/assets/remove", "POST"), ("/assets/apply", "POST"), ("/settings/assets", "POST"), ("/templates/delete", "POST"), ("/settings/backup/schedule", "POST"), ("/settings/backup/location", "POST"), ("/settings/backup/move", "POST"), ("/settings/destination/test", "POST")}
 
 
 def test_session_tokens(tmp_path):
@@ -259,7 +259,7 @@ def test_pages_show_write_buttons_when_allowed(runnable):
     app, c, calls = runnable
     assert "Apply overlay" in c.get("/item/1").text
     assert "Apply to this library" in c.get("/library").text
-    assert "Apply to everything" in c.get("/jobs").text
+    assert "Apply overlays" in c.get("/jobs").text
 
 
 def test_changed_only_checkbox_is_offered_and_passed_through(runnable):
@@ -280,7 +280,7 @@ def test_status_shows_the_schedule_and_maintenance_link_unticks_the_box(tmp_path
     assert app.state.scheduler is not None and not app.state.scheduler.is_alive()      # not started unless asked
     assert "checked" in c.get("/confirm?action=apply&scope=library&lib=Movies").text.split('name="changed"')[1][:40]
     assert "checked" not in c.get("/confirm?action=apply&scope=all&changed=0").text.split('name="changed"')[1][:40]
-    assert "Run full maintenance now" in c.get("/jobs").text
+    assert "Run maintenance" in c.get("/jobs").text
 
 
 def test_no_scheduler_without_a_password_or_without_a_schedule(tmp_path):

@@ -14,7 +14,7 @@
     </select>
     <input type="search" name="q" value="{{ q }}" placeholder="Search title">
     <select name="show" aria-label="Filter the titles" class="showfilter">
-      <option value="">Filter: everything</option>
+      <option value="">All titles</option>
       {% for group, opts in show_groups %}<optgroup label="{{ group }}">{% for v, label in opts %}<option value="{{ v }}" {{ "selected" if v == show }}>{{ label }}</option>{% endfor %}</optgroup>{% endfor %}
     </select>
     <span id="resetslot">{% include "_reset.html" %}</span>
@@ -32,22 +32,26 @@
     <div class="viewtoggle" role="radiogroup" aria-label="View">
       {% for v, label in views %}<label><input type="radio" name="view" value="{{ v }}" {{ "checked" if v == view }}><span>{{ label }}</span></label>{% endfor %}
     </div>
+    {% if has_copies %}<div class="viewtoggle" role="radiogroup" aria-label="Copies of the same title" title="A title present more than once in this library (an HD and a UHD folder, for example)">
+      <label><input type="radio" name="combine" value="1" {{ "checked" if combine }}><span>Copies together</span></label>
+      <label><input type="radio" name="combine" value="0" {{ "checked" if not combine }}><span>Each copy</span></label>
+    </div>{% endif %}
     <select name="per" aria-label="Titles per page">
       {% for v, label in pers %}<option value="{{ v }}" {{ "selected" if v == per }}>{{ label }}</option>{% endfor %}
     </select>
   </form>
   <a class="btn plain" href="/assets?s={{ srv }}">Custom posters</a>
-  {% if selectable %}<a class="btn" href="/confirm?action=apply&scope=selection&changed=0&{{ base }}">Apply to these {{ total }} title{{ "" if total == 1 else "s" }}&hellip;</a>{% endif %}
-  {% if selectable %}<a class="btn plain" href="/confirm?action=restore&scope=selection&what=scores&{{ base }}" title="Put the original posters back for exactly these titles">Restore these {{ total }}&hellip;</a>{% endif %}
+  {% if selectable %}<a class="btn" href="/confirm?action=apply&scope=selection&changed=0&{{ base }}">Apply to these {{ n_items }} title{{ "" if n_items == 1 else "s" }}&hellip;</a>{% endif %}
+  {% if selectable %}<a class="btn plain" href="/confirm?action=restore&scope=selection&what=scores&{{ base }}" title="Put the original posters back for exactly these titles">Restore these {{ n_items }}&hellip;</a>{% endif %}
   {% if can_write and lib %}<a class="btn {{ 'plain' if selectable }}" href="/confirm?action=apply&scope=library&lib={{ lib | urlencode }}&s={{ srv }}">Apply to this library&hellip;</a>{% endif %}
 </div>
-<div class="hrow legend"><span class="muted">What the filter finds</span>{% call info("i-filter") %}<dl class="opts">
-  <dt>No MDBList score</dt><dd>Titles MDBList gave no score (or a score of 0), titles with no IMDb, TMDb or TVDB id (fan edits), and titles that have not been looked up yet. It reads what laminator saved from earlier runs and never asks MDBList.</dd>
-  <dt>Manual score override</dt><dd>Titles with a <code>score:</code> entry in overrides.yaml.</dd>
+<div class="hrow legend"><span class="muted">What the filter finds</span>{% call info("i-filter", "libinfo") %}<dl class="opts">
+  <dt>MDBList score missing</dt><dd>Titles where MDBList has no score from any source (a score of 0 counts as none), titles with no IMDb, TMDb or TVDB id (fan edits), and titles that have not been looked up yet. Titles you gave a manual score are left out: they already have one. It reads what laminator saved from earlier runs and never asks MDBList.</dd>
+  <dt>Manual score</dt><dd>Titles with a <code>score:</code> entry in overrides.yaml.</dd>
   <dt>Score, year and content rating</dt><dd>Narrow the list further. The score range uses the chosen source: the MDBList combined score (a manual override counts as the score), or one provider's score, from earlier lookups. Titles without a score for that source are left out. Scores are on a scale of 0 to 10. The content rating list shows the ratings present in this library.
   <dt>Poster filters</dt><dd>Match the label on each title: not managed, overlay applied, original poster, changed on server. The rest find titles with a custom poster, or no poster in the server at all.</dd>
-  <dt>Metadata</dt><dd><em>Overridden</em>: values from overrides.yaml were written to the title. <em>Listed</em>: overrides.yaml has an entry for it, applied or not.</dd></dl>{% endcall %}
-  <span class="muted legend2">What the labels on each title mean</span>{% call info("i-legend") %}<dl class="opts">
+  <dt>Metadata</dt><dd><em>Override applied</em>: values from overrides.yaml were written to the title. <em>Override pending</em>: overrides.yaml has an entry with values that are not on the title yet (apply to write them).</dd></dl>{% endcall %}
+  <span class="muted legend2">What the labels on each title mean</span>{% call info("i-legend", "libinfo") %}<dl class="opts">
   <dt><span class="badge plain">not managed</span></dt><dd>laminator has not changed this title's poster yet.</dd>
   <dt><span class="badge ok">overlay 7.7</span></dt><dd>The score (here 7.7) is drawn on the poster in the server.</dd>
   <dt><span class="badge orig">original poster</span></dt><dd>laminator has saved the original, and the plain original (no score) is what the server shows now, for example after a restore.</dd>

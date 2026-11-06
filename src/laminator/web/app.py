@@ -24,16 +24,18 @@ from urllib.parse import urlencode, urlparse
 
 import httpx
 import yaml
+from starlette.concurrency import run_in_threadpool
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from PIL import Image
+from PIL import Image, ImageDraw
 
 import ipaddress
 
 from .. import actions, assets
 from .. import audit
+from .. import copies as copiesmod
 from .. import storage as storagemod
 from .. import baseposters as bp
 from .. import __version__
@@ -62,16 +64,20 @@ from .scheduler import Scheduler
 HERE = Path(__file__).parent
 PAGE = 48
 COOKIE_VIEW = "laminator_view"
+COOKIE_COMBINE = "laminator_combine"  # "1" (default): copies of one title are shown as one card; "0": each copy on its own
 VIEWS = {"posters": ("Posters", 48), "compact": ("Compact", 120), "list": ("List", 100)}  # name -> (label, titles per page)
-SHOW_GROUPS = [("Scores", [("no_mdb", "No MDBList score"), ("has_mdb", "MDBList score available"), ("my_score", "Manual score override")]),
-               ("Poster", [("not_managed", "Not managed"), ("overlay", "Overlay applied"), ("original", "Original restored"),
-                           ("changed", "Changed on server"), ("custom", "Custom poster"), ("no_poster", "No server poster"),
-                           ("thumb", "Thumbnail instead of poster"), ("zero", "Badge reads 0.0")]),
-               ("Metadata", [("meta_written", "Metadata overridden"), ("in_file", "Listed in overrides.yaml")])]
+SHOW_GROUPS = [("Metadata", [("meta_written", "Override applied"), ("in_file", "Override pending")]),  # groups and entries are in alphabetical order
+               ("Poster", [("changed", "Changed on server"), ("custom", "Custom poster"), ("not_managed", "Not managed"), ("original", "Original restored"),
+                           ("overlay", "Overlay applied"), ("no_poster", "Poster missing"), ("zero", "Score invalid (0.0)"),
+                           ("thumb", "Thumbnail (not poster)")]),
+               ("Scores", [("my_score", "Manual score"), ("no_mdb", "MDBList score missing"), ("has_mdb", "MDBList score present")])]
 NO_RATING = "__none__"
 SHOW_LABEL = {v: label for _, opts in SHOW_GROUPS for v, label in opts}
 SELECTION_MAX = 5000  # the most titles one "apply to these" run takes
 COOKIE_PER = "laminator_per"
+ASSET_PER = (25, 50, 75, 100, 250, 500)  # the Custom posters page pages instead of scrolling: its list is short and every row has details to read
+COOKIE_ASSET_PER = "laminator_assets_per"
+ASSET_STATUS = [("", "Every poster"), ("ok", "In use"), ("warn", "Waiting for the next run"), ("bad", "Unusable"), ("unmatched", "Not matched to any title")]
 PER_CHOICES = [("scroll", "Scroll (loads as you go)")] + [(str(n), f"{n} per page") for n in (25, 50, 75, 100, 250, 500)]
 RAIL = ["#"] + [chr(c) for c in range(65, 91)]
 
@@ -131,7 +137,7 @@ NOTES = {"saved": ("ok", "Saved."), "destok": ("ok", "Saved the backup destinati
          "pwnoreset": ("warn", "There is no password in .env or the environment to fall back to, so the saved one cannot be removed."),
          "srvsaved": ("ok", ""), "genok": ("ok", "Settings saved."), "reset": ("ok", "Back to the values in the config file."),
          "bkup": ("ok", "Backup uploaded and verified."), "setupdone": ("ok", "Password saved and you are signed in. Next: add your media server and your MDBList key below."), "mfaoff": ("ok", "Two-factor sign-in is off. Every other session was signed out."),
-         "mfabad": ("bad", ""), "sessionsended": ("ok", ""), "mfarecovery": ("warn", "You signed in with a recovery code. It cannot be used again; make new ones under Interface password if you are running low."), "assetsok": ("ok", "Custom posters folder saved."), "bkbad": ("bad", ""),
+         "mfabad": ("bad", ""), "sessionsended": ("ok", ""), "mfarecovery": ("warn", "You signed in with a recovery code. It cannot be used again; make new ones under Interface password if you are running low."), "assetsok": ("ok", "Custom posters folder saved."), "bkloc": ("ok", "Backup folder saved. New backups go there."), "bklocdefault": ("ok", "Back to the default backup folder (inside the data folder)."), "bkmoved": ("ok", "Nothing to move: no backups were in the old folder."), "bkbad": ("bad", ""),
          "mdadded": ("ok", "Override added to overrides.yaml. Review it below, then apply."), "mdsaved": ("ok", "overrides.yaml saved."),
          "mdentry": ("ok", "Override updated in overrides.yaml. Review the change below, then apply."),
          "mddup": ("warn", "This item already has an override. Edit it in the editor instead of adding a second one."),
@@ -182,7 +188,7 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
     """server: {kind: client} (or one client, taken to be the first configured kind); data: the shared data folder;
     password: None only for the explicit insecure local mode (then the UI is read-only)."""
     app = FastAPI(title="laminator", docs_url=None, redoc_url=None, openapi_url=None)
-    if password is not None and not setup and (data / bk.BACKUP_DIR).is_dir():  # read the backups' summaries once in the background, so the first Settings visit is not the slow one
+    if password is not None and not setup and bk.configured_dir(data)[0].is_dir():  # read the backups' summaries once in the background, so the first Settings visit is not the slow one
         threading.Thread(target=lambda: bk.list_backups(data), name="backup-index", daemon=True).start()
     tpls = Jinja2Templates(directory=str(HERE / "templates"))  # autoescape on: server data is untrusted
     build = re.sub(r"[^0-9a-zA-Z]", "", os.environ.get("LAMINATOR_BUILD", ""))[:12]
@@ -524,26 +530,48 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
                 pass
         return found
 
+    def pending_override_ids(kind: str) -> set[str]:
+        """Ids of titles with an overrides.yaml entry that writes server fields (rating, title, ...) where at least one of them is not yet on the
+        title (saved as written in laminator's own record). A poster-only entry (score, template) never counts: it has nothing to write."""
+        try:
+            entries = metamod.for_server(metamod.load_overrides(overrides_file, required=False), kind)
+        except metamod.OverrideError:
+            return set()
+        store, by_lib, found = store_for(kind), libs(kind), set()
+        for e in entries:
+            wanted = {k for k in e if k in metamod.SPEC}
+            if not wanted:
+                continue
+            try:
+                for it in metamod.resolve(e, by_lib):
+                    if wanted - set(store.meta_get(it.id)):
+                        found.add(it.id)
+            except metamod.OverrideError:
+                pass
+        return found
+
     def has_mdblist_score(it) -> bool:
-        """True when an earlier lookup saved a real combined score for the title (a 0 means none). Never asks MDBList."""
+        """True when an earlier lookup saved a real score for the title, the combined one or any single source's (a 0 means none). Never asks MDBList."""
         mk = "movie" if it.type == "Movie" else "show"
         for prov in ("imdb", "tmdb", "tvdb"):
             pid = it.provider_ids.get(prov)
             d = mdbmod.cached_title(data / "cache" / "mdblist", prov, mk, pid) if pid else None
-            if d and mdbmod.pick_score(d, ["aggregate"]) is not None:
-                return True
+            if d and mdbmod.pick_score(d, ["aggregate"] + [r.get("source") for r in d.get("ratings") or []]) is not None:
+                return True  # the combined score, or any single source's: either gives the poster a score
         return False
 
     def match_show(kind: str, show: str, items: list) -> list:
         store = store_for(kind)
-        if show in ("no_mdb", "has_mdb"):
-            want = show == "has_mdb"
-            return [it for it in items if has_mdblist_score(it) == want]
+        if show == "has_mdb":
+            return [it for it in items if has_mdblist_score(it)]
+        if show == "no_mdb":  # nothing from MDBList AND no score of your own: a title you already corrected by hand is not "missing"
+            manual = override_ids(kind, only_scores=True)
+            return [it for it in items if not has_mdblist_score(it) and it.id not in manual]
         if show == "my_score":
             ids = override_ids(kind, only_scores=True)
             return [it for it in items if it.id in ids]
         if show == "in_file":
-            ids = override_ids(kind)
+            ids = pending_override_ids(kind)
             return [it for it in items if it.id in ids]
         if show == "custom":
             idx = bp.AssetIndex(assets_root())
@@ -647,7 +675,7 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
 
     @app.get("/library", response_class=HTMLResponse)
     def library(request: Request, lib: str | None = None, q: str = "", page_no: int = 1, view: str = "", per: str = "", more: int = 0, show: str = "",
-                smin: str = "", smax: str = "", ssrc: str = "aggregate", ymin: str = "", ymax: str = "", crate: str = ""):
+                smin: str = "", smax: str = "", ssrc: str = "aggregate", ymin: str = "", ymax: str = "", crate: str = "", combine: str = ""):
         kind = pick(request)
         all_libs = libs(kind)
         names = list(all_libs)
@@ -661,24 +689,37 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         scroll = per_now == "scroll"
         size = VIEWS[view_now][1] if scroll else int(per_now)  # in scroll mode: how many titles each load adds
         show, f = parse_filters(show, smin, smax, ssrc, ymin, ymax, crate)
-        items, first_idx = listing(kind, lib, q, show, f)  # first_idx: letter -> index of the first title with it (the A-Z rail target)
-        pages = max(1, -(-len(items) // size))
+        items, _ = listing(kind, lib, q, show, f)
+        has_copies = any(len(g.copies) > 1 for g in copiesmod.group_items(all_libs.get(lib, [])))
+        combine_now = (combine if combine in ("0", "1") else request.cookies.get(COOKIE_COMBINE, "1")) != "0"
+        groups = copiesmod.group_items(items) if combine_now and has_copies else [copiesmod.Group(it, [it]) for it in items]
+        first_idx: dict = {}  # letter -> index of the first title with it (the A-Z rail target)
+        for n, g in enumerate(groups):
+            first_idx.setdefault(bucket(g.primary.name), n)
+        n_items = len(items)
+        pages = max(1, -(-len(groups) // size))
         page_no = min(max(page_no, 1), pages)
         first_on_page = {L: n // size + 1 for L, n in first_idx.items()}
         # scroll mode: the page asked for is the last chunk to show; a "more" request adds just that chunk
         start = (page_no - 1) * size if (not scroll or more) else 0
         end = page_no * size
         cards = []
-        for n, it in enumerate(items[start:end], start):
-            cls, label = state_of(store.get(it.id), it)
-            keys = sorted(store.meta_get(it.id))
+        for n, g in enumerate(groups[start:end], start):
+            it = g.primary
+            states = [state_of(store.get(c.id), c) for c in g.copies]
+            cls, label = states[0]
+            state_title = STATE_TITLES.get(cls, "")
+            if len(set(states)) > 1:  # copies in different states: say so, and say which
+                cls, label = "warn", "copies differ"
+                state_title = "; ".join(f"{copiesmod.copy_label(c, i)}: {st[1]}" for i, (c, st) in enumerate(zip(g.copies, states), 1))
+            other = sorted({k for c in g.copies for k in store.meta_get(c.id) if k != "critic_rating"})  # the CriticRating write is housekeeping: no label for it
             meta, meta_title = "", ""
-            other = [k for k in keys if k != "critic_rating"]  # the CriticRating write is housekeeping: no label for it
             if other:
                 meta = "metadata"
-                meta_title = "Values from overrides.yaml (" + ", ".join(k.replace("_", " ") for k in other) + ") were written to this item in the server and locked."
+                meta_title = "Values from overrides.yaml (" + ", ".join(k.replace("_", " ") for k in other) + ") were written to " + ("an item" if len(g.copies) == 1 else "these copies") + " in the server and locked."
             b_ = bucket(it.name)
-            cards.append({"it": it, "cls": cls, "label": label, "meta": meta, "meta_title": meta_title, "state_title": STATE_TITLES.get(cls, ""), "anchor": b_ if first_idx[b_] == n else ""})
+            cards.append({"it": it, "n": len(g.copies), "copies_title": ", ".join(copiesmod.copy_label(c, i) for i, c in enumerate(g.copies, 1)),
+                          "cls": cls, "label": label, "meta": meta, "meta_title": meta_title, "state_title": state_title, "anchor": b_ if first_idx[b_] == n else ""})
         keep = {"s": kind or "", "lib": lib or "", "q": q, "view": view_now, "per": per_now}
         reset = urlencode({k: v for k, v in keep.items() if k != "q"})  # everything back to the defaults; the library and the view stay
         base = filter_query(kind, lib, q, view_now, per_now, show, f)
@@ -689,24 +730,31 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
             r = getattr(it, "rating", None) or NO_RATING
             rating_counts[r] = rating_counts.get(r, 0) + 1
         rating_options = [(r, "Not set" if r == NO_RATING else r, n) for r, n in sorted(rating_counts.items(), key=lambda kv: (kv[0] == NO_RATING, kv[0]))]
-        rail = [{"l": L, "page": first_on_page.get(L)} for L in RAIL] if len(items) > size // 2 and len(first_on_page) > 1 else []
+        rail = [{"l": L, "page": first_on_page.get(L)} for L in RAIL] if len(groups) > size // 2 and len(first_on_page) > 1 else []
         sched_on = bool(sch.sched and (sch.sched.changed_every_minutes or sch.sched.maintenance_day))
         first_run = bool(kind) and not state_counts(sdir(kind))[0] and not sched_on  # nothing applied yet, nothing scheduled
         ctx = {"show": show, "show_groups": SHOW_GROUPS, "show_label": SHOW_LABEL.get(show, ""), "clear": clear, "reset": reset, "has_filters": bool(shown_f or q.strip()), "filters": shown_f, "f": f, "selectable": bool(shown_f or q.strip()) and bool(items) and can_write,
                "rating_options": rating_options, "score_sources": [(i, SOURCES[i]) for i in SOURCE_ORDER],
-               "more_open": bool(shown_f and (show == "" or len(shown_f) > 1)), "first_run": first_run, "libs": names, "lib": lib, "q": q, "page_no": page_no, "pages": pages, "total": len(items), "cards": cards,
+               "more_open": bool(shown_f and (show == "" or len(shown_f) > 1)), "first_run": first_run, "libs": names, "lib": lib, "q": q, "page_no": page_no, "pages": pages, "total": len(groups), "n_items": n_items, "has_copies": has_copies, "combine": combine_now, "cards": cards,
                "error": lib_error(kind), "view": view_now, "views": [(k, v[0]) for k, v in VIEWS.items()], "base": base, "rail": rail,
-               "per": per_now, "pers": PER_CHOICES, "scroll": scroll, "has_more": scroll and end < len(items)}
+               "per": per_now, "pers": PER_CHOICES, "scroll": scroll, "has_more": scroll and end < len(groups)}
         htmx = request.headers.get("HX-Request")
         resp = page(request, ("_more.html" if more and scroll else "_grid.html") if htmx else "library.html", ctx, kind=kind)
         if per in valid_per:  # remembered between visits (a display preference, nothing sensitive)
             resp.set_cookie(COOKIE_PER, per, max_age=365 * 86400, httponly=True, samesite="strict")
         if view in VIEWS:  # remember the choice (a display preference, nothing sensitive)
             resp.set_cookie(COOKIE_VIEW, view, max_age=365 * 86400, httponly=True, samesite="strict")
+        if combine in ("0", "1"):
+            resp.set_cookie(COOKIE_COMBINE, combine, max_age=365 * 86400, httponly=True, samesite="strict")
         return resp
 
     @app.get("/item/{item_id}", response_class=HTMLResponse)
-    def item_page(request: Request, item_id: str, template: str = "default"):
+    def item_page(request: Request, item_id: str, template: str = "default", note: str = "", detail: str = "", at: str = ""):
+        return render_item(request, item_id, template, note, detail, at)
+
+    def render_item(request: Request, item_id: str, template: str = "default", note: str = "", detail: str = "", at: str = "", typed: dict | None = None,
+                    status_code: int = 200):
+        """The title page. `typed` is an override form that was refused: it is shown again as typed, so nothing is entered twice."""
         kind = pick(request)
         lib, it = find(kind, item_id)
         if it is None:
@@ -734,13 +782,20 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         except Exception:  # the item page must still load if the server cannot list ratings
             ratings = []
         ids = [k for k in ("imdb", "tmdb", "tvdb") if it.provider_ids.get(k)]
+        grp = copiesmod.group_of(libs(kind).get(lib, []), it.id)
+        copy_rows = []
+        if grp is not None and len(grp.copies) > 1:
+            for n_, c_ in enumerate(grp.copies, 1):
+                st_ = state_of(store.get(c_.id), c_)
+                copy_rows.append({"it": c_, "label": copiesmod.copy_label(c_, n_), "cls": st_[0], "state": st_[1], "current": c_.id == it.id, "managed": store.get(c_.id) is not None})
         ov = existing_override(kind, lib, it)
-        ctx = {"ov": ov, "ratings": ratings, "match_label": f"{ids[0].upper()} id" if ids else "library, title and year", "it": it, "lib": lib, "cls": cls, "label": label, "row": row, "fields": fields, "score": score,
+        nk_, nt_ = NOTES.get(note, ("", ""))
+        ctx = {"note_kind": nk_, "note_text": nt_ or detail, "note_detail": detail if nt_ else "", "note_at": at if at in ITEM_AT else "", "typed": typed, "copy_rows": copy_rows, "copy_ids": ",".join(r["it"].id for r in copy_rows), "ov": ov, "ratings": ratings, "match_label": f"{ids[0].upper()} id" if ids else "library, title and year", "it": it, "lib": lib, "cls": cls, "label": label, "row": row, "fields": fields, "score": score,
                "meta_rows": meta_rows, "locked": full.get("LockedFields") or [], "template": template,
                "templates": template_names(), "custom": custom_poster_ctx(kind, it),
                "now": {k: metamod.show_value(metamod.get_value(full, k)) for k in ("title", "tagline", "critic_rating", "tags", "genres", "studios", "rating", "sort_title", "original_title")},
                "source_choices": [(i, SOURCES[i]) for i in SOURCE_ORDER], **usual_choices()}
-        return page(request, "item.html", ctx, kind=kind)
+        return page(request, "item.html", ctx, kind=kind, status_code=status_code)
 
     def existing_override(kind: str, lib: str, it) -> dict | None:
         """The overrides.yaml entry that already applies to this title, as form values, so the item page edits it instead of starting
@@ -1096,9 +1151,20 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
             except ConfigError:
                 pass
 
-    def back(note: str, detail: str = ""):
-        q = urlencode({"note": note, **({"detail": detail[:160]} if detail else {})})
-        return RedirectResponse(f"/settings?{q}", status_code=303)
+    SETTINGS_AT = {"server-emby", "server-jellyfin", "mdblist", "options", "assets", "backup-folder", "backup-schedule", "backup-copy", "backups",
+                   "password", "mfa", "sessions"}  # the sections of the Settings page a note can belong to (see note_here in _ui.html)
+
+    def back(note: str, detail: str = "", at: str = ""):
+        """Back to Settings with a note, which is shown inside the section it is about (`at`); the page opens scrolled to it."""
+        q = urlencode({"note": note, **({"detail": detail[:160]} if detail else {}), **({"at": at} if at in SETTINGS_AT else {})})
+        return RedirectResponse(f"/settings?{q}#note", status_code=303)
+
+    def key_at(name: str) -> str:
+        kind = key_name_to_kind(name)
+        return f"server-{kind}" if kind else "mdblist"
+
+    def reset_at(section: str) -> str:
+        return ("server-" + section[7:]) if section.startswith("server:") else {"general": "options", "destination": "backup-copy", "assets": "assets"}.get(section, "")
 
     def key_name_to_kind(name: str) -> str | None:
         return next((k for k in KINDS if server_key_env(cfg, k) == name), None)
@@ -1164,14 +1230,14 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         return cards
 
     @app.get("/settings", response_class=HTMLResponse)
-    def settings_page(request: Request, note: str = "", detail: str = ""):
-        return render_settings(request, note, detail)
+    def settings_page(request: Request, note: str = "", detail: str = "", at: str = ""):
+        return render_settings(request, note, detail, at=at)
 
-    def render_settings(request: Request, note: str = "", detail: str = "", form: dict | None = None, status_code: int = 200):
+    def render_settings(request: Request, note: str = "", detail: str = "", form: dict | None = None, status_code: int = 200, at: str = ""):
         kind_, text = NOTES.get(note, ("", ""))
         sc = schedmod.parse(cfg)
         ctx = {"cards": server_cards(form), "form_kind": (form or {}).get("kind", ""), "mdb_key": key_row(MDBLIST_ENV, "MDBList API key"),
-               "note_kind": kind_, "note_text": text or detail, "note_detail": detail if text else "",
+               "note_kind": kind_, "note_text": text or detail, "note_detail": detail if text else "", "note_at": at if at in SETTINGS_AT else "",
                "mfa_on": mfa.enabled(data), "mfa_left": mfa.recovery_left(data), "sessions": store.active(),
                "pw_saved": passwords.load(data) is not None, "pw_env": password is not None, "pw_min": passwords.MIN_LEN,
                "secrets_file": str(secrets_store.path(data).resolve()), "settings_file": str((data / "settings.yaml").resolve()),
@@ -1188,6 +1254,7 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
                "backups": [{"name": r.path.name, "mb": round(r.size / 1e6, 1), "created": r.created, "has_secrets": r.has_secrets,
                             "servers": ", ".join(f"{LABEL.get(k, k)}: {v['posters']} poster{'' if v['posters'] == 1 else 's'}, {v['meta']} metadata" for k, v in r.servers.items()),
                             "problem": r.notes[0] if r.notes and not r.created else ""} for r in bk.list_backups(data)],
+               "bk_loc": bk.location_info(data), "bk_env": bool(os.environ.get(bk.ENV_DIR, "").strip()),
                "max_upload_mb": MAX_UPLOAD // (1024 * 1024)}
         return page(request, "settings.html", ctx, status_code=status_code)
 
@@ -1200,14 +1267,14 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         if name not in allowed_names():
             return HTMLResponse("Unknown setting", status_code=400)
         if jm.running():
-            return back("busy")
+            return back("busy", at=key_at(name))
         try:
             secrets_store.save(data, name, value.strip())
         except ValueError:
-            return back("bad", "That does not look like an API key (8-200 characters: letters, digits and . _ ~ + / = -).")
+            return back("bad", "That does not look like an API key (8-200 characters: letters, digits and . _ ~ + / = -).", at=key_at(name))
         reconnect()
         ok, msg = test_key(name)
-        return back("ok" if ok else "fail", ("Saved. " if ok else "Saved, but: ") + msg)
+        return back("ok" if ok else "fail", ("Saved. " if ok else "Saved, but: ") + msg, at=key_at(name))
 
     @app.post("/settings/clear")
     def settings_clear(request: Request, name: str = Form(), token: str = Form("")):
@@ -1217,11 +1284,11 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         if name not in allowed_names():
             return HTMLResponse("Unknown setting", status_code=400)
         if jm.running():
-            return back("busy")
+            return back("busy", at=key_at(name))
         if secrets_store.source(data, name) == "settings":
             secrets_store.clear(data, name)
             reconnect()
-        return back("cleared")
+        return back("cleared", at=key_at(name))
 
     @app.post("/settings/test")
     def settings_test(request: Request, name: str = Form(), token: str = Form("")):
@@ -1231,7 +1298,7 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         if name not in allowed_names():
             return HTMLResponse("Unknown setting", status_code=400)
         ok, msg = test_key(name)
-        return back("ok" if ok else "fail", msg)
+        return back("ok" if ok else "fail", msg, at=key_at(name))
 
     # ---- servers: address, library, on/off -----------------------------------------------------------------------
     @app.post("/settings/server")
@@ -1246,10 +1313,10 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         typed = {"kind": kind, "url": url.strip(), "library": library.strip(), "enabled": enabled == "1"}
 
         def refuse(message: str):  # show the page again with everything as typed, so nothing has to be entered twice
-            return render_settings(request, "bad", message, form=typed, status_code=422)
+            return render_settings(request, "bad", message, form=typed, status_code=422, at=f"server-{kind}")
 
         if jm.running():
-            return back("busy")
+            return back("busy", at=f"server-{kind}")
         key_saved = False
         if api_key.strip():  # the one Save button stores the key too (first, so a mistake in the address does not lose it)
             try:
@@ -1284,8 +1351,8 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         reconnect()
         if kind in rt.servers:
             ok, msg = test_key(server_key_env(cfg, kind))
-            return back("ok" if ok else "fail", ("Saved. " if ok else "Saved, but: ") + msg)
-        return back("srvsaved", f"{LABEL[kind]} saved. Add its API key to connect.")
+            return back("ok" if ok else "fail", ("Saved. " if ok else "Saved, but: ") + msg, at=f"server-{kind}")
+        return back("srvsaved", f"{LABEL[kind]} saved. Add its API key to connect.", at=f"server-{kind}")
 
     RESET_TEXT = {
         "general": ("Go back to the config file for the options?",
@@ -1332,11 +1399,11 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         else:
             return HTMLResponse("Unknown section", status_code=400)
         if jm.running():
-            return back("busy")
+            return back("busy", at=reset_at(section))
         save_settings(data, saved)
         reload_config()
         reconnect()
-        return back("reset")
+        return back("reset", at=reset_at(section))
 
     # ---- options: CriticRating and the schedule ------------------------------------------------------------------
     @app.post("/settings/general")
@@ -1358,14 +1425,14 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
             clean = {"grace_days": int(grace_days), "trash_days": int(trash_days)}
             cln.Limits.from_cfg({"cleanup": clean})
         except (ValueError, ConfigError, FileNotFoundError) as e:
-            return back("bad", f"Options: {e}")
+            return back("bad", f"Options: {e}", at="options")
         saved = load_settings(data)
         saved["critic_rating"] = critic == "1"
         saved["schedule"] = candidate
         saved["cleanup"] = clean
         save_settings(data, saved)
         reload_config()
-        return back("genok")
+        return back("genok", at="options")
 
     @app.post("/settings/backup/schedule")
     def settings_backup_schedule(request: Request, backup_every_days: str = Form("7"), backup_keep: str = Form("5"), token: str = Form("")):
@@ -1379,12 +1446,12 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
                          "backup": {"every_days": int(backup_every_days), "keep": int(backup_keep)}}
             schedmod.parse({"schedule": candidate})
         except (ValueError, ConfigError) as e:
-            return back("bad", f"Backup schedule: {e}")
+            return back("bad", f"Backup schedule: {e}", at="backup-schedule")
         saved = load_settings(data)
         saved["schedule"] = candidate
         save_settings(data, saved)
         reload_config()
-        return back("genok")
+        return back("genok", at="backup-schedule")
 
     # ---- custom base posters -----------------------------------------------------------------------------------
     def assets_root() -> Path:
@@ -1402,25 +1469,118 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         return "warn", "waiting for the next run"
 
     @app.get("/assets", response_class=HTMLResponse)
-    def assets_page(request: Request, note: str = "", detail: str = ""):
+    def assets_page(request: Request, note: str = "", detail: str = "", q: str = "", status: str = "", view: str = "", per: str = "", page_no: int = 1):
         kind = pick(request)
         root = assets_root()
         idx = bp.AssetIndex(root)
-        matched, used = [], set()
+        rows, used = [], set()
         for lib, items in libs(kind).items():
             for it in items:
                 p = idx.find(it)
                 if p is not None:
                     used.add(p)
                     cls, text = asset_status(kind, it, p)
-                    matched.append({"id": it.id, "name": it.name, "year": it.year, "lib": lib, "rel": idx.rel(p), "cls": cls, "text": text})
-        matched.sort(key=lambda m: sort_key(m["name"]))
-        unmatched = sorted(idx.rel(p) for p in idx.files.values() if p not in used)
+                    rows.append({"kind": "title", "id": it.id, "name": it.name, "year": it.year, "lib": lib, "rel": idx.rel(p), "cls": cls, "text": text, "v": file_version(p)})
+        rows.sort(key=lambda m: sort_key(m["name"]))
+        for p in sorted((f for f in idx.files.values() if f not in used), key=idx.rel):
+            rows.append({"kind": "file", "id": "", "name": p.stem, "year": None, "lib": "", "rel": idx.rel(p), "cls": "plain", "text": "not matched to any title", "v": file_version(p)})
+        counts = {"": len(rows), "ok": 0, "warn": 0, "bad": 0, "unmatched": 0}
+        for r in rows:
+            counts["unmatched" if r["kind"] == "file" else r["cls"]] = counts.get("unmatched" if r["kind"] == "file" else r["cls"], 0) + 1
+        waiting = counts.get("warn", 0) + counts.get("bad", 0)
+        status = status if status in {k for k, _ in ASSET_STATUS} else ""
+        needle = " ".join(q.lower().split())
+        shown = [r for r in rows
+                 if (not status or (status == "unmatched" and r["kind"] == "file") or (status != "unmatched" and r["kind"] == "title" and r["cls"] == status))
+                 and (not needle or needle in " ".join((r["name"], r["lib"], r["rel"], r["text"])).lower())]
+        chosen = view if view in VIEWS else request.cookies.get(COOKIE_VIEW, "")
+        view_now = chosen if chosen in VIEWS else "posters"
+        valid_per = {str(n) for n in ASSET_PER}
+        per_now = per if per in valid_per else request.cookies.get(COOKIE_ASSET_PER, "")
+        per_now = per_now if per_now in valid_per else "100"
+        size = int(per_now)
+        pages = max(1, -(-len(shown) // size))
+        page_no = min(max(page_no, 1), pages)
+        keep_ = {"s": kind or "", "q": q, "status": status, "view": view_now, "per": per_now}
         nk, nt = ASSET_NOTES.get(note, ("", ""))
-        ctx = {"root": str(root), "exists": root.is_dir(), "matched": matched, "unmatched": unmatched[:300], "n_unmatched": len(unmatched),
-               "default_root": str((data / "assets").resolve()), "custom_root": isinstance(cfg.get("assets_dir"), str), "waiting": sum(1 for m in matched if m["cls"] != "ok"),
+        ctx = {"root": str(root), "exists": root.is_dir(), "matched": counts["ok"] + counts["warn"] + counts["bad"], "waiting": waiting, "rows": shown[(page_no - 1) * size:page_no * size],
+               "total": len(shown), "all_total": len(rows), "page_no": page_no, "pages": pages, "q": q, "status": status, "view": view_now, "views": [(k, v[0]) for k, v in VIEWS.items()],
+               "status_opts": [(k, label, counts.get(k, 0)) for k, label in ASSET_STATUS], "per": per_now, "pers": [(str(n), f"{n} per page") for n in ASSET_PER],
+               "base": urlencode(keep_), "filtered": bool(needle or status), "reset": urlencode({"s": kind or "", "view": view_now, "per": per_now}),
+               "default_root": str((data / "assets").resolve()), "custom_root": isinstance(cfg.get("assets_dir"), str),
                "note_kind": nk, "note_text": nt or detail, "note_detail": detail if nt else ""}
-        return page(request, "assets.html", ctx, kind=kind)
+        htmx = request.headers.get("HX-Request")
+        resp = page(request, "_asset_list.html" if htmx else "assets.html", ctx, kind=kind)
+        if per in valid_per:  # remembered between visits (a display preference, nothing sensitive)
+            resp.set_cookie(COOKIE_ASSET_PER, per, max_age=365 * 86400, httponly=True, samesite="strict")
+        if view in VIEWS:  # the same choice as the Library page's
+            resp.set_cookie(COOKIE_VIEW, view, max_age=365 * 86400, httponly=True, samesite="strict")
+        return resp
+
+    def file_version(p: Path) -> int:
+        try:
+            return p.stat().st_mtime_ns
+        except OSError:
+            return 0
+
+    placeholder: dict = {}
+
+    def unreadable_thumb() -> Response:
+        """A dark tile with a cross, for a file that cannot be shown (not an image, too large): the row's status already says why."""
+        if "jpeg" not in placeholder:
+            im = Image.new("RGB", (300, 450), (20, 14, 40))
+            d = ImageDraw.Draw(im)
+            d.rectangle([2, 2, 297, 447], outline=(90, 60, 140), width=3)
+            d.line([60, 150, 240, 300], fill=(120, 80, 160), width=6)
+            d.line([240, 150, 60, 300], fill=(120, 80, 160), width=6)
+            buf = io.BytesIO(); im.save(buf, "JPEG", quality=80)
+            placeholder["jpeg"] = buf.getvalue()
+        return Response(placeholder["jpeg"], media_type="image/jpeg", headers={"Cache-Control": "private, max-age=60", "X-Placeholder": "unreadable"})
+
+    @app.get("/assets/thumb")
+    def asset_thumb(rel: str = "", v: str = ""):
+        """A small JPEG of one custom poster file, named by its path inside the assets folder. Only real image files inside that folder are
+        served (no .., no hidden files, no links out of it); thumbnails are cached under cache/asset-thumbs, keyed by the file's change time."""
+        root = assets_root()
+        parts = rel.split("/")
+        if (not rel or len(rel) > 400 or "\x00" in rel or rel.startswith("/") or len(parts) > bp.MAX_DEPTH + 1
+                or any(x in ("", ".", "..") or x.startswith(".") for x in parts) or Path(rel).suffix.lower() not in bp.EXTS):
+            return Response(status_code=404)
+        f = root / rel
+        try:
+            real = f.resolve(strict=True)
+            real.relative_to(root.resolve())
+            st = real.stat()
+        except (OSError, ValueError):
+            return Response(status_code=404)
+        if not real.is_file():
+            return Response(status_code=404)
+        if st.st_size > bp.MAX_BYTES:
+            return unreadable_thumb()
+        key = hashlib.sha256(rel.encode()).hexdigest()[:20]
+        folder = data / "cache" / "asset-thumbs"
+        out = folder / f"{key}-{st.st_mtime_ns}-{st.st_size}.jpg"
+        if not out.is_file():
+            try:
+                with Image.open(real) as im:
+                    if im.size[0] * im.size[1] > bp.MAX_PIXELS:
+                        return unreadable_thumb()
+                    img = im.convert("RGB")
+                img.thumbnail((300, 450))
+                folder.mkdir(parents=True, exist_ok=True)
+                tmp = out.with_name(f"{out.name}.{os.getpid()}-{threading.get_ident()}.tmp")  # its own name: two requests for one thumbnail never share a half-written file
+                try:
+                    img.save(tmp, "JPEG", quality=85)
+                    tmp.replace(out)
+                finally:
+                    tmp.unlink(missing_ok=True)
+            except Exception:  # an unreadable file: the row still shows its status
+                return unreadable_thumb()
+            for old in folder.glob(key + "-*.jpg"):  # one thumbnail per file: drop those of earlier versions of it
+                if old != out:
+                    old.unlink(missing_ok=True)
+        versioned = v == str(st.st_mtime_ns)
+        return FileResponse(out, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=31536000, immutable" if versioned else "private, max-age=60"})
 
     def asset_job_template() -> str:
         return sch.sched.template if sch.sched else "default"
@@ -1440,12 +1600,12 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         try:
             dest = bp.save(assets_root(), bp.AssetIndex(assets_root()), it, raw)
         except (bp.AssetError, OSError) as e:
-            return RedirectResponse(f"/assets?{urlencode({'s': srv, 'note': 'bad', 'detail': f'Custom poster for {it.name} refused: {e}'})}", status_code=303)
+            return item_back(srv, it.id, "bad", f"Custom poster for {it.name} refused: {e}", "custom")
         title = f"{LABEL[srv]}: custom poster for {it.name}"
         try:
             job = jm.start(title, lambda: apply_work(srv, None, it.id, asset_job_template(), False), priority=True)
         except actions.Busy:
-            return RedirectResponse(f"/assets?{urlencode({'s': srv, 'note': 'busy'})}", status_code=303)
+            return item_back(srv, it.id, "busy", "", "custom")
         return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
     @app.post("/assets/remove")
@@ -1487,12 +1647,12 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
             try:
                 saved["assets_dir"] = bp.validate_dir(path)
             except ValueError as e:
-                return back("bad", f"Custom posters folder: {e}")
+                return back("bad", f"Custom posters folder: {e}", at="assets")
         else:
             saved.pop("assets_dir", None)  # blank = the default folder
         save_settings(data, saved)
         reload_config()
-        return back("assetsok")
+        return back("assetsok", at="assets")
 
     # ---- where backups are copied to ----------------------------------------------------------------------------
     @app.post("/settings/destination")
@@ -1508,13 +1668,13 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
             if password:
                 secrets_store.save(data, dst.SMB_PASSWORD_ENV, password)  # blank keeps the saved one
         except ValueError as e:
-            return back("bad", f"Backup destination: {e}")
+            return back("bad", f"Backup destination: {e}", at="backup-copy")
         saved = load_settings(data)
         saved["backup_destination"] = clean
         save_settings(data, saved)
         reload_config()
         schedmod.update(data, push_error="")
-        return back("destok")
+        return back("destok", at="backup-copy")
 
     @app.post("/settings/destination/test")
     def settings_destination_test(request: Request, token: str = Form("")):
@@ -1523,22 +1683,86 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
             return refusal
         d = dst.from_cfg(cfg)
         if d is None:
-            return back("bad", "No backup destination is set.")
+            return back("bad", "No backup destination is set.", at="backup-copy")
         try:
-            return back("ok", d.check())
+            return back("ok", d.check(), at="backup-copy")
         except dst.DestError as e:
-            return back("fail", f"{d.describe()}: {e}")
+            return back("fail", f"{d.describe()}: {e}", at="backup-copy")
 
     # ---- backup and restore of laminator itself -----------------------------------------------------------------
     def bk_path(name: str) -> Path | None:
         """A backup file in <data>/backups by exact file name; anything else (paths, odd names) is refused."""
         if name != Path(name).name or not bk.NAME_RE.match(name):
             return None
-        p = bk.backups_dir(data) / name
+        try:
+            p = bk.backups_dir(data) / name
+        except bk.BackupError:
+            return None
         return p if p.is_file() else None
 
     def ev(kind: str, name: str = "", message: str = "") -> actions.Event:
         return actions.Event(kind, name, message)
+
+    def move_job(old: Path, new: Path):
+        def work():
+            yield ev("info", message=f"moving the backups from {old} to {new} (each is copied, checked, and only then removed from {old})...")
+            try:
+                moved = bk.move_backups(old, new)
+            except bk.BackupError as e:
+                yield ev("warn", message=f"stopped: {e}")
+                return
+            for n in moved:
+                yield ev("backup", n, f"moved to {new}")
+            yield ev("info", message=f"done: {len(moved)} backup(s) moved")
+        return jm.start(f"Move backups to {new}", work)
+
+    def archives_in(folder: Path) -> bool:
+        try:
+            return folder.is_dir() and any(f.is_file() and not f.is_symlink() for f in folder.glob("laminator-backup-*.tar.gz"))
+        except OSError:
+            return False
+
+    @app.post("/settings/backup/location")
+    def backup_location(request: Request, path: str = Form(""), move: str = Form(""), token: str = Form("")):
+        refusal = guard(request, token)
+        if refusal:
+            return refusal
+        if jm.running():
+            return back("busy", at="backup-folder")
+        saved = load_settings(data)
+        old, _ = bk.configured_dir(data)
+        if path.strip():
+            try:
+                value = bk.validate_location(path, data)
+                bk.check_writable(Path(value))
+            except (ValueError, bk.BackupError) as e:
+                return back("bkbad", f"Backup folder: {e}", at="backup-folder")
+            saved["backup_dir"] = value
+        else:
+            saved.pop("backup_dir", None)  # blank = the default folder (or LAMINATOR_BACKUP_DIR if that is set)
+        save_settings(data, saved)
+        reload_config()
+        new, _ = bk.configured_dir(data)
+        if move == "1" and old.resolve() != new.resolve() and archives_in(old):
+            try:
+                return RedirectResponse(f"/jobs/{move_job(old, new).id}", status_code=303)
+            except actions.Busy:
+                return back("busy", at="backup-folder")
+        return back("bkloc" if path.strip() else "bklocdefault", at="backup-folder")
+
+    @app.post("/settings/backup/move")
+    def backup_move(request: Request, token: str = Form("")):
+        """Move the backups left in the default folder into the folder now in use."""
+        refusal = guard(request, token)
+        if refusal:
+            return refusal
+        old, new = bk.default_dir(data), bk.configured_dir(data)[0]
+        if old.resolve() == new.resolve() or not archives_in(old):
+            return back("bkmoved", at="backup-folder")
+        try:
+            return RedirectResponse(f"/jobs/{move_job(old, new).id}", status_code=303)
+        except actions.Busy:
+            return back("busy", at="backup-folder")
 
     @app.post("/settings/backup/create")
     def backup_create(request: Request, include_secrets: str = Form(""), passphrase: str = Form(""),
@@ -1548,9 +1772,9 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
             return refusal
         inc = include_secrets == "1"
         if inc and passphrase != passphrase2:
-            return back("bkbad", "The two passphrases do not match.")
+            return back("bkbad", "The two passphrases do not match.", at="backups")
         if inc and len(passphrase) < bk.MIN_PASSPHRASE:
-            return back("bkbad", f"The passphrase must be at least {bk.MIN_PASSPHRASE} characters.")
+            return back("bkbad", f"The passphrase must be at least {bk.MIN_PASSPHRASE} characters.", at="backups")
 
         def work():
             yield ev("info", message="creating the backup (this can take a while with many saved originals)...")
@@ -1570,7 +1794,7 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         try:
             job = jm.start("Backup of laminator's data", work)
         except actions.Busy:
-            return back("busy")
+            return back("busy", at="backups")
         return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
     @app.get("/backups/download/{name}")
@@ -1598,7 +1822,7 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         try:
             job = jm.start(f"Verify {p.name}", work)
         except actions.Busy:
-            return back("busy")
+            return back("busy", at="backups")
         return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
     @app.post("/backups/upload")
@@ -1606,7 +1830,10 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         refusal = guard(request, token)
         if refusal:
             return refusal
-        part = bk.backups_dir(data) / time.strftime("laminator-backup-uploaded-%Y%m%d-%H%M%S.tar.gz.part")
+        try:
+            part = bk.backups_dir(data) / time.strftime("laminator-backup-uploaded-%Y%m%d-%H%M%S.tar.gz.part")
+        except bk.BackupError as e:
+            return back("bkbad", f"Upload refused: {e}", at="backups")
         size = 0
         try:
             with open(part, "wb") as out:
@@ -1618,9 +1845,9 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
             bk.verify(part)  # names, plain files only, every checksum; the upload is useless (and refused) if it fails
         except bk.BackupError as e:
             part.unlink(missing_ok=True)
-            return back("bkbad", f"Upload refused: {e}")
+            return back("bkbad", f"Upload refused: {e}", at="backups")
         part.replace(part.with_name(part.name[:-5]))
-        return back("bkup")
+        return back("bkup", at="backups")
 
     @app.get("/backups/restore", response_class=HTMLResponse)
     def backup_restore_page(request: Request, name: str):
@@ -1632,7 +1859,7 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         try:
             m = bk.read_manifest(p)
         except bk.BackupError as e:
-            return back("bkbad", str(e))
+            return back("bkbad", str(e), at="backups")
         will_move = bk._existing(data, restoring_secrets=m.get("has_secrets", False))
         return page(request, "restore_confirm.html", {
             "name": name, "created": m.get("created", "?"), "has_secrets": bool(m.get("has_secrets")),
@@ -1662,7 +1889,7 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         try:
             job = jm.start(f"Restore {p.name}", work)
         except actions.Busy:
-            return back("busy")
+            return back("busy", at="backups")
         return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
     # ---- metadata overrides: plan, edit, apply ---------------------------------------------------------------------
@@ -1678,6 +1905,13 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         tmp = overrides_file.with_name("overrides.yaml.tmp")
         tmp.write_text(text)
         tmp.replace(overrides_file)
+
+    ITEM_AT = {"override", "custom"}  # the forms on the title page a note can belong to
+
+    def item_back(srv: str, item_id: str, note: str, detail: str = "", at: str = "override"):
+        """Back to the title page with the note next to the form it is about, so a refused form is not taken away from its title."""
+        q = {"s": srv, "note": note, **({"detail": detail[:200]} if detail else {}), "at": at}
+        return RedirectResponse(f"/item/{item_id}?{urlencode(q)}#note", status_code=303)
 
     def md_back(note: str, detail: str = "", kind: str | None = None):
         q = {"note": note, **({"detail": detail[:200]} if detail else {}), **({"s": kind} if kind else {})}
@@ -1772,6 +2006,14 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         lib, it = find(srv, item)
         if it is None:
             return HTMLResponse("Item not found", status_code=404)
+        typed = {"form": {k: g(k) for k in ("rating", "title", "sort_title", "original_title", "overview", "tagline", "critic_rating", "score", "template", "source",
+                                              "tags", "genres", "studios") if g(k)},
+                 "modes": {**{k: g(k + "_mode") for k in ("tags", "genres", "studios") if g(k + "_mode")}, **{k + "_clear": bool(g("clear_" + k)) for k in ("tagline", "overview")}},
+                 "no_overlay": bool(g("no_overlay"))}
+
+        async def refuse(message: str, note: str = "mdbad"):  # the title page again, with what was typed, and the reason beside the form
+            return await run_in_threadpool(render_item, request, it.id, "default", note, message, "override", typed, 422)
+
         fields: dict = {}
         try:
             for key in ("rating", "title", "sort_title", "original_title", "overview", "tagline"):
@@ -1815,16 +2057,16 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
             if g("no_overlay"):
                 fields["overlay"] = False
         except (metamod.OverrideError, ValueError) as e:
-            return md_back("mdbad", str(e), srv)
+            return await refuse(str(e))
         if not fields:
-            return md_back("mdbad", "Nothing to add: fill in at least one field.", srv)
+            return await refuse("Nothing to add: fill in at least one field.")
         if "rating" in fields:
             try:
                 allowed = rt.servers[srv].rating_names(it.id)
             except httpx.HTTPError:
                 allowed = []
             if allowed and fields["rating"] not in allowed:
-                return md_back("mdbad", f"{fields['rating']!r} is not a rating {LABEL[srv]} knows ({', '.join(allowed)}).", srv)
+                return await refuse(f"{fields['rating']!r} is not a rating {LABEL[srv]} knows ({', '.join(allowed)}).")
         if g("entry"):  # the item page edits the entry that already applies to this title
             try:
                 idx = int(g("entry"))
@@ -1834,7 +2076,7 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
                 old = entries[idx]
                 new_text = metamod.replace_entry(overrides_text(), idx, metamod.entry_yaml(old["match"], fields, old.get("server")))
             except (metamod.OverrideError, ValueError) as e:
-                return md_back("mdbad", str(e), srv)
+                return await refuse(str(e))
             write_overrides(new_text)
             return md_back("mdentry", "", srv)
         ids = {k: it.provider_ids[k] for k in ("imdb", "tmdb", "tvdb") if it.provider_ids.get(k)}
@@ -1843,16 +2085,16 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         try:
             existing = metamod.parse_overrides(overrides_text())
         except metamod.OverrideError as e:
-            return md_back("mdbad", f"overrides.yaml has a problem, fix it first: {e}", srv)
+            return await refuse(f"overrides.yaml has a problem, fix it first: {e}")
         if any(e["match"] == match and e.get("server") in (None, srv) for e in existing):
-            return md_back("mddup", "", srv)
+            return await refuse("", "mddup")
         try:
             new_text = metamod.append_entry(overrides_text(), metamod.entry_yaml(match, fields, server))
             after = metamod.parse_overrides(new_text)
             if len(after) != len(existing) + 1 or after[-1]["match"] != match:  # appended exactly one entry, the intended one
                 raise metamod.OverrideError("the file's layout made the append unreliable; use the editor")
         except metamod.OverrideError as e:
-            return md_back("mdbad", str(e), srv)
+            return await refuse(str(e))
         write_overrides(new_text)
         return md_back("mdadded", "", srv)
 
@@ -2285,7 +2527,7 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
             return refusal
         bad = password_check(request, current)
         if bad:
-            return back(bad)
+            return back(bad, at="mfa")
         if mfa.enabled(data):
             return RedirectResponse("/settings/mfa", status_code=303)
         mfa.start(data)
@@ -2328,7 +2570,7 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
             limiter.fail(client_ip(request))
             return RedirectResponse("/settings/mfa?bad=code", status_code=303)
         mfa.disable(data)
-        return signed_in_again(back("mfaoff"), request, "two-factor sign-in turned off")
+        return signed_in_again(back("mfaoff", at="mfa"), request, "two-factor sign-in turned off")
 
     @app.post("/settings/mfa/recovery")
     def settings_mfa_recovery(request: Request, current: str = Form(""), code: str = Form(""), token: str = Form("")):
@@ -2352,7 +2594,7 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
             return refusal
         n = store.delete_others(request.cookies.get(auth.COOKIE))
         audit.log(data, "other sessions signed out", ip=client_ip(request), ended=n)
-        return back("sessionsended", f"Signed out {n} other session{'' if n == 1 else 's'}.")
+        return back("sessionsended", f"Signed out {n} other session{'' if n == 1 else 's'}.", at="sessions")
 
     # ---- the interface password -----------------------------------------------------------------------
     @app.post("/settings/password")
@@ -2363,18 +2605,18 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
             return refusal
         who = client_ip(request)
         if limiter.blocked(who):
-            return back("pwlimit")
+            return back("pwlimit", at="password")
         if not login_ok(current):
             limiter.fail(who)
-            return back("pwwrong")
+            return back("pwwrong", at="password")
         if new != confirm:
-            return back("pwmismatch")
+            return back("pwmismatch", at="password")
         err = passwords.policy_error(new)
         if err:
-            return back("bad", f"Password: {err}.")
+            return back("bad", f"Password: {err}.", at="password")
         limiter.ok(who)
         passwords.save(data, new)
-        return signed_in_again(back("pwok"), request, "password changed")
+        return signed_in_again(back("pwok", at="password"), request, "password changed")
 
     @app.post("/settings/password/reset")
     def settings_password_reset(request: Request, token: str = Form("")):
@@ -2382,9 +2624,9 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
         if refusal:
             return refusal
         if password is None:  # nothing to fall back to: removing the saved hash would lock you out
-            return back("pwnoreset")
+            return back("pwnoreset", at="password")
         passwords.remove(data)
-        return signed_in_again(back("pwreset"), request, "saved password removed")
+        return signed_in_again(back("pwreset", at="password"), request, "saved password removed")
 
     def signed_in_again(resp, request: Request | None = None, why: str = "password changed"):
         """End every other session; this browser stays signed in."""
@@ -2400,7 +2642,7 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
     @app.get("/confirm", response_class=HTMLResponse)
     def confirm(request: Request, action: str, scope: str, item: str = "", lib: str = "", what: str = "all",
                 template: str = "default", changed: str = "1", q: str = "", show: str = "", smin: str = "", smax: str = "",
-                ssrc: str = "aggregate", ymin: str = "", ymax: str = "", crate: str = "", view: str = "", per: str = ""):
+                ssrc: str = "aggregate", ymin: str = "", ymax: str = "", crate: str = "", view: str = "", per: str = "", ids: str = ""):
         if not can_write:
             return HTMLResponse("The UI is read-only without a password.", status_code=403)
         kind = pick(request)
@@ -2415,9 +2657,15 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
             except FileNotFoundError:
                 return HTMLResponse("Template not found", status_code=404)
             show, f = parse_filters(show, smin, smax, ssrc, ymin, ymax, crate)
-            chosen = listing(kind, lib, q, show, f)[0][:SELECTION_MAX]
-            desc = "; ".join(describe_filters(show, f) + ([f"search '{q.strip()[:30]}'"] if q.strip() else []))
-            back = "/library?" + filter_query(kind, lib, q, view or "posters", per or "scroll", show, f)
+            if ids.strip():  # named titles (the copies of one title, from its page): exactly these, if they are in this library
+                inlib = {it.id: it for it in libs(kind).get(lib, [])}
+                chosen = [inlib[i] for i in dict.fromkeys(x for x in ids.split(",") if x) if i in inlib][:SELECTION_MAX]
+                desc = "the copies of one title"
+                back = f"/item/{chosen[0].id}?s={kind}" if chosen else "/library?" + filter_query(kind, lib, q, view or "posters", per or "scroll", show, f)
+            else:
+                chosen = listing(kind, lib, q, show, f)[0][:SELECTION_MAX]
+                desc = "; ".join(describe_filters(show, f) + ([f"search '{q.strip()[:30]}'"] if q.strip() else []))
+                back = "/library?" + filter_query(kind, lib, q, view or "posters", per or "scroll", show, f)
             plural = "" if len(chosen) == 1 else "s"
             if action == "restore":
                 title = f"Restore the original poster of {len(chosen)} selected title{plural} on {LABEL[kind]}"
@@ -2666,7 +2914,8 @@ def create_app(cfg: dict, server, data: Path, password: str | None, mdb=None, sc
                          "orig_mb": round(sum(f.stat().st_size for f in files) / 1e6, 1)})
         ctx = {"rows": rows, "mdb_key": key_row(MDBLIST_ENV, "MDBList API key"), "data": str(data.resolve()),
                "fonts": assets.list_fonts(data), "templates": template_names(), "critic": bool(cfg.get("critic_rating", False)),
-               "mdb_left": getattr(rt.mdb, "remaining", None) if rt.mdb else None, "sched": schedule_info()}
+               "mdb_left": getattr(rt.mdb, "remaining", None) if rt.mdb else None, "sched": schedule_info(),
+               "bk_loc": bk.location_info(data)}
         ctx["security"] = {"mfa": mfa.enabled(data), "mfa_left": mfa.recovery_left(data), "sessions": len(store.active()),
                            "proxies": os.environ.get("LAMINATOR_TRUSTED_PROXIES", "").strip(), "public_url": public.geturl() if public.netloc else "",
                            "https": is_https(request), "short_password": bool(password and len(password) < 12 and passwords.load(data) is None)}

@@ -36,6 +36,7 @@
   {% else %}<tr><th>Schedule</th><td class="muted">off</td></tr>{% endif %}
   <tr><th>Write score to CriticRating</th><td>{{ "on" if critic else "off" }} &middot; <a href="/settings#critic">change in Settings</a></td></tr>
   <tr><th>Data folder</th><td><code>{{ data }}</code></td></tr>
+  <tr><th>Backup folder</th><td><code>{{ bk_loc.path }}</code> <span class="muted">({{ bk_loc.count }} backup{{ "" if bk_loc.count == 1 else "s" }}{% if bk_loc.source == "settings" %}; chosen in Settings{% elif bk_loc.source == "environment" %}; set by LAMINATOR_BACKUP_DIR{% else %}; the default, inside the data folder{% endif %})</span>{% if not bk_loc.ok %} <span class="badge bad">not usable</span> {{ bk_loc.error }}{% endif %}{% if bk_loc.stranded %} <span class="badge warn">{{ bk_loc.stranded }} still in {{ bk_loc.default }}</span> <a href="/settings#backup">move them</a>{% endif %}</td></tr>
   <tr><th>Templates</th><td>{{ templates | join(", ") }}</td></tr>
   <tr><th>Fonts</th><td>{{ fonts | join(", ") }}</td></tr>
 </table>

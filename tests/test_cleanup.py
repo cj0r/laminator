@@ -163,7 +163,9 @@ def test_old_renders_caches_and_exports_are_deleted_young_ones_kept(tmp_path):
     for d in ("out", ):
         (ws.data / d).mkdir()
     (ws.root / "cache" / "posters").mkdir(parents=True); (ws.root / "cache" / "mdblist").mkdir(parents=True); (ws.root / "exports").mkdir()
-    spec = [(ws.data / "out" / "old.jpg", 31, False), (ws.data / "out" / "new.jpg", 5, True),
+    (ws.root / "cache" / "asset-thumbs").mkdir(parents=True)
+    spec = [(ws.root / "cache" / "asset-thumbs" / "old.jpg", 15, False), (ws.root / "cache" / "asset-thumbs" / "new.jpg", 2, True),
+            (ws.data / "out" / "old.jpg", 31, False), (ws.data / "out" / "new.jpg", 5, True),
             (ws.root / "cache" / "posters" / "old.img", 15, False), (ws.root / "cache" / "posters" / "new.img", 2, True),
             (ws.root / "cache" / "mdblist" / "old.json", 8, False), (ws.root / "cache" / "mdblist" / "new.json", 3, True),
             (ws.root / "exports" / "laminator-posters-emby-20200101-000000.zip", 15, False), (ws.root / "exports" / "laminator-posters-emby-20260101-000000.zip", 1, True),

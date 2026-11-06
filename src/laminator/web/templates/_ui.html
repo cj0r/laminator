@@ -1,4 +1,8 @@
 {# A clickable (i): the explanation is hidden until it is clicked. CSS only (a checkbox), so it works under the strict CSP.
    Use inside a flex-wrap ".hrow" or ".row":  {% call info("unique-id") %}text{% endcall %}
    With a group name, {% call info("unique-id", "group") %}, icons that share the group open one at a time (a second click closes it).  #}
+{# The page's note (what just happened) shown INSIDE the section it is about, so the user is not sent to the top of a long page: the redirect ends in
+   #note and the note carries id="note" and data-focus (app.js scrolls to it for pages that are drawn rather than redirected to). `at` names the section;
+   the page passes note_at. Import with context:  {% from "_ui.html" import note_here with context %} #}
+{% macro note_here(at) %}{% if note_text and note_at == at %}<p class="note {{ note_kind or 'ok' }}" id="note" data-focus role="{{ 'alert' if note_kind == 'bad' else 'status' }}" tabindex="-1">{{ note_text }}{% if note_detail %} {{ note_detail }}{% endif %}</p>{% endif %}{% endmacro %}
 {% macro info(id, group="") %}<input type="{{ 'radio' if group else 'checkbox' }}"{% if group %} name="{{ group }}"{% endif %} id="{{ id }}" class="infotoggle"><label for="{{ id }}" class="infoicon" title="More information" aria-label="More information">i</label><div class="infobody">{{ caller() }}</div>{% endmacro %}

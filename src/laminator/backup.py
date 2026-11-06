@@ -25,13 +25,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import __version__
-from .config import KINDS
+from .config import KINDS, load_settings
 
 FORMAT = 1
 MANIFEST = "manifest.json"
 SECRETS_MEMBER = "secrets.enc"
 MAGIC = b"LMSEC1"
-BACKUP_DIR = "backups"
+BACKUP_DIR = "backups"  # the default folder, inside the data folder
+ENV_DIR = "LAMINATOR_BACKUP_DIR"  # or the folder is set with this environment variable (a folder saved in Settings wins)
 AUTO_PREFIX = "laminator-backup-auto-"  # scheduled backups: the only ones retention ever deletes
 NAME_RE = re.compile(r"^laminator-backup-[A-Za-z0-9._-]{1,60}\.tar\.gz$")
 MIN_PASSPHRASE = 10
@@ -155,10 +156,124 @@ def decrypt_secrets(blob: bytes, passphrase: str) -> dict:
 
 
 # ---- create ---------------------------------------------------------------------------------------------
+def default_dir(root: Path) -> Path:
+    return root / BACKUP_DIR
+
+
+def configured_dir(root: Path) -> tuple[Path, str]:
+    """Where the primary backups are kept, and why: a folder saved in Settings, else LAMINATOR_BACKUP_DIR, else <data>/backups."""
+    v = load_settings(root).get("backup_dir")
+    if isinstance(v, str) and v.startswith("/"):
+        return Path(v), "settings"
+    e = os.environ.get(ENV_DIR, "").strip()
+    if e.startswith("/"):
+        return Path(e), "environment"
+    return default_dir(root), "default"
+
+
+def validate_location(value: str, root: Path) -> str:
+    """The Settings value for the backup folder: an absolute path without .. parts. It may not be the data folder itself or sit inside the
+    parts of it that a restore replaces (servers, templates, fonts), or a restore would move the backups aside along with them."""
+    v = (value or "").strip()
+    if not v.startswith("/") or "\x00" in v or len(v) > 500 or any(x == ".." for x in v.split("/")):
+        raise ValueError("the folder must be an absolute path (start with /), without .. parts; in a container it is the path of the mounted volume")
+    v = v.rstrip("/") or "/"
+    target, base = Path(v).resolve(), root.resolve()
+    if target == base:
+        raise ValueError("that is the data folder itself; use a folder of its own (or leave this blank for the default)")
+    for sub in ("servers", "templates", "fonts", "cache"):
+        if target == base / sub or (base / sub) in target.parents:
+            raise ValueError(f"that is inside the data folder's {sub}/ folder, which a restore replaces; use another folder")
+    return v
+
+
+def check_writable(folder: Path) -> None:
+    """Create the folder if needed and prove a file can be written there, with a plain sentence when not."""
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        probe = folder / f".laminator-write-test-{os.getpid()}-{time.time_ns()}"
+        probe.write_bytes(b"ok")
+        probe.unlink()
+    except PermissionError:
+        raise BackupError(f"{folder} is not writable by laminator. Check that the volume is mounted there and that its owner is the user "
+                          "the container runs as.")
+    except OSError as e:
+        raise BackupError(f"{folder} cannot be used: {e.strerror or type(e).__name__}. Check that the volume is mounted there.")
+
+
 def backups_dir(root: Path) -> Path:
-    d = root / BACKUP_DIR
-    d.mkdir(parents=True, exist_ok=True)
+    d, _ = configured_dir(root)
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        raise BackupError(f"the backup folder {d} cannot be used: {e.strerror or type(e).__name__}. Check that the volume is mounted there.")
     return d
+
+
+def location_info(root: Path) -> dict:
+    """What the Settings and Status pages show: the folder, why it is that one, whether it works, and how many backups are in it."""
+    d, source = configured_dir(root)
+    info = {"path": str(d.resolve()), "source": source, "default": str(default_dir(root).resolve()), "custom": source != "default", "ok": True,
+            "error": "", "count": 0, "stranded": 0}  # absolute for display: the data folder may be given as a relative path (the container's working folder)
+    try:
+        info["count"] = sum(1 for f in d.glob("laminator-backup-*.tar.gz") if f.is_file()) if d.is_dir() else 0
+        if not d.exists():
+            check_writable(d)
+        elif not os.access(d, os.W_OK | os.X_OK):
+            raise BackupError(f"{d} is not writable by laminator. Check that the volume is mounted there and that its owner is the user the container runs as.")
+    except BackupError as e:
+        info["ok"], info["error"] = False, str(e)
+    dflt = default_dir(root)
+    if source != "default" and dflt.is_dir():
+        info["stranded"] = sum(1 for f in dflt.glob("laminator-backup-*.tar.gz") if f.is_file() and not f.is_symlink())
+    return info
+
+
+def move_backups(src: Path, dest: Path) -> list[str]:
+    """Move the backups in `src` to `dest`. Each is copied to <name>.part, read back and compared (SHA-256), renamed into place, and only
+    then removed from `src`; a backup that is already in `dest` with the same content is just removed from `src`. Anything that fails
+    stops the move and leaves every not-yet-moved backup where it was. Returns the names moved."""
+    if src.resolve() == dest.resolve():
+        return []
+    check_writable(dest)
+    moved = []
+    for f in sorted(src.glob("laminator-backup-*.tar.gz")):
+        if not f.is_file() or f.is_symlink() or not NAME_RE.match(f.name):
+            continue
+        target = dest / f.name
+        if target.exists():
+            if target.stat().st_size == f.stat().st_size and _sha(target) == _sha(f):
+                f.unlink()
+                moved.append(f.name)
+                continue
+            raise BackupError(f"{target} already exists with different content; nothing was moved past {f.name}")
+        part = dest / (f.name + ".part")
+        try:
+            with open(f, "rb") as fin, open(part, "wb") as fout:
+                shutil.copyfileobj(fin, fout, 1 << 20)
+                fout.flush()
+                os.fsync(fout.fileno())
+            if _sha(part) != _sha(f):
+                raise BackupError(f"{f.name} did not copy cleanly; it was left where it was")
+            os.chmod(part, 0o600)
+            part.replace(target)
+        except OSError as e:
+            part.unlink(missing_ok=True)
+            raise BackupError(f"could not copy {f.name} to {dest}: {e.strerror or type(e).__name__}; it was left where it was")
+        except BaseException:
+            part.unlink(missing_ok=True)
+            raise
+        f.unlink()
+        moved.append(f.name)
+    return moved
+
+
+def _sha(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        while chunk := fh.read(1 << 20):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def create(root: Path, out: Path | None = None, include_secrets: bool = False, passphrase: str | None = None,
@@ -323,7 +438,10 @@ def list_backups(root: Path) -> list[Report]:
     the whole file (about 10 s for a 2 GB backup). The summaries are therefore remembered in cache/backup-index.json, keyed by the file's
     name, size and modification time; a backup that changed or is new is read once."""
     out, index, changed = [], _load_index(root), False
-    files = sorted(backups_dir(root).glob("laminator-backup-*.tar.gz"), reverse=True)
+    try:
+        files = sorted(backups_dir(root).glob("laminator-backup-*.tar.gz"), reverse=True)
+    except (BackupError, OSError):
+        return []  # the folder is missing or not writable: the Settings page says so (location_info); there is nothing to list
     for f in files:
         fp = _fingerprint(f)
         hit = index.get(f.name)

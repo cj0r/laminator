@@ -1,0 +1,17 @@
+{% if view == "list" %}{% for r in rows %}
+{% if r.kind == "title" %}<a class="lrow assetrow" href="/item/{{ r.id }}?s={{ srv }}">{% else %}<div class="lrow assetrow">{% endif %}
+  <img loading="lazy" decoding="async" width="300" height="450" src="/assets/thumb?rel={{ r.rel | urlencode }}&v={{ r.v }}" alt="">
+  <span class="lname"><strong>{{ r.name }}</strong> <span class="muted">{{ r.year or "" }}</span>
+    <span class="afile muted">{% if r.lib %}{{ r.lib }} &middot; {% endif %}<code>{{ r.rel }}</code></span></span>
+  <span class="lbadges"><span class="badge {{ r.cls }}">{{ r.text }}</span></span>
+{% if r.kind == "title" %}</a>{% else %}</div>{% endif %}
+{% endfor %}{% else %}{% for r in rows %}
+{% if r.kind == "title" %}<a class="card assetcard" href="/item/{{ r.id }}?s={{ srv }}" title="{{ r.name }}{% if r.year %} ({{ r.year }}){% endif %} - {{ r.rel }}">{% else %}<div class="card assetcard" title="{{ r.rel }}">{% endif %}
+  <img loading="lazy" decoding="async" width="300" height="450" src="/assets/thumb?rel={{ r.rel | urlencode }}&v={{ r.v }}" alt="{{ r.name }}">
+  <div class="meta">
+    <strong>{{ r.name }}</strong> <span class="muted yr">{{ r.year or "" }}</span>
+    <div class="afile muted">{% if r.lib %}{{ r.lib }} &middot; {% endif %}<code>{{ r.rel }}</code></div>
+    <div class="tags"><span class="badge {{ r.cls }}">{{ r.text }}</span></div>
+  </div>
+{% if r.kind == "title" %}</a>{% else %}</div>{% endif %}
+{% endfor %}{% endif %}
