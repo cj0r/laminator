@@ -32,9 +32,9 @@
     <div class="viewtoggle" role="radiogroup" aria-label="View">
       {% for v, label in views %}<label><input type="radio" name="view" value="{{ v }}" {{ "checked" if v == view }}><span>{{ label }}</span></label>{% endfor %}
     </div>
-    {% if has_copies %}<div class="viewtoggle" role="radiogroup" aria-label="Copies of the same title" title="A title present more than once in this library (an HD and a UHD folder, for example)">
-      <label><input type="radio" name="combine" value="1" {{ "checked" if combine }}><span>Copies together</span></label>
-      <label><input type="radio" name="combine" value="0" {{ "checked" if not combine }}><span>Each copy</span></label>
+    {% if has_copies %}<div class="viewtoggle" role="radiogroup" aria-label="Versions of the same title" title="A title present more than once in this library (an HD and a UHD folder, for example)">
+      <label><input type="radio" name="combine" value="1" {{ "checked" if combine }}><span>Versions stacked</span></label>
+      <label><input type="radio" name="combine" value="0" {{ "checked" if not combine }}><span>Unstacked</span></label>
     </div>{% endif %}
     <select name="per" aria-label="Titles per page">
       {% for v, label in pers %}<option value="{{ v }}" {{ "selected" if v == per }}>{{ label }}</option>{% endfor %}
@@ -56,6 +56,10 @@
   <dt><span class="badge ok">overlay 7.7</span></dt><dd>The score (here 7.7) is drawn on the poster in the server.</dd>
   <dt><span class="badge orig">original poster</span></dt><dd>laminator has saved the original, and the plain original (no score) is what the server shows now, for example after a restore.</dd>
   <dt><span class="badge warn">changed on server</span></dt><dd>The poster in the server changed since laminator last wrote it (you picked another one, or a refresh replaced it). The next apply deals with it.</dd>
-  <dt><span class="badge changed">metadata</span></dt><dd>Values from your overrides.yaml (content rating, sort title and so on) were written to this title and locked.</dd></dl>{% endcall %}</div>
+  <dt><span class="badge changed">metadata</span></dt><dd>Values from your overrides.yaml (content rating, sort title and so on) were written to this title and locked.</dd></dl>{% endcall %}
+  {% if has_copies %}<span class="muted legend2">What stacking versions does</span>{% call info("i-stack", "libinfo") %}<dl class="opts">
+  <dt>Versions stacked</dt><dd>Versions of the same title in this library (an HD and a UHD folder, for example) are shown as one poster with a badge such as <em>2 copies</em>. This only changes how the Library is displayed.</dd>
+  <dt>Unstacked</dt><dd>Every version is shown as its own poster.</dd>
+  <dt>On the server</dt><dd>Nothing is merged: each version is a separate item with its own poster, state, custom poster and overrides. Counts and <em>Apply to these N titles</em> include every version either way. The choice is remembered.</dd></dl>{% endcall %}{% endif %}</div>
 <div id="grid">{% include "_grid.html" %}</div>
 {% endblock %}

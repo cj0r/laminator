@@ -1,6 +1,6 @@
 # Two stages: dependencies are installed (from pinned versions) in a build stage, and the final image gets only the result,
 # without pip. The base image is pinned by digest; Dependabot (.github/dependabot.yml) proposes updates for it and requirements.txt.
-ARG PYTHON_IMAGE=python:3.13-slim@sha256:ae14d4ce8771606477a81446e7ef429edd6762305fc50c84507c1041fa8285d1
+ARG PYTHON_IMAGE=python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
 
 FROM ${PYTHON_IMAGE} AS build
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1

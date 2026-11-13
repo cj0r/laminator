@@ -86,8 +86,8 @@ def test_copies_are_shown_together_by_default_with_a_badge_and_honest_counts(ui)
     html = c.get("/library?s=emby").text
     assert cards(html) == ["10", "13", "14", "12", "15"][:0] or sorted(cards(html)) == sorted(["10", "12", "13", "14", "15"])   # 1917 and Jaws once each
     assert "2 copies" in html and "3 copies" in html and html.count('class="badge copies"') == 2
-    assert "5 items (8 posters: copies of one title are shown together)" in html
-    assert 'name="combine"' in html and "Copies together" in html and "Each copy" in html
+    assert "5 items (8 posters: versions of one title are stacked)" in html
+    assert 'name="combine"' in html and "Versions stacked" in html and "Unstacked" in html and "What stacking versions does" in html
     assert 'title="movies/1917 (2019), movies-uhd/1917 (2019)"' in html
 
 

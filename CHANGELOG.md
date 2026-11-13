@@ -2,6 +2,17 @@
 
 Versions follow [semantic versioning](https://semver.org). Docker images are tagged `latest` (the newest release), `<version>`, `<major>.<minor>` and `<major>` (for a release tag such as `v0.2.0`), and `dev` (the latest test build from the development repository).
 
+## 0.3.2 (2026-11-12)
+
+### Changed
+- The footer stays at the bottom of the window as a slim row and expands to the full footer at the end of the page.
+- The Library's copies switch is now labelled Versions stacked / Unstacked, with an info icon explaining it.
+- Updated the pinned dependencies: click 8.5.1, fastapi 0.162.5, pydantic 2.14.3, pydantic-core 2.50.4, typing-inspection 0.4.5 and annotated-doc 0.0.6.
+- Updated the bundled htmx from 2.0.4 to 2.0.11, and listed it in the third-party notices.
+- The Docker image uses the current `python:3.13-slim` base (rebuilt 2026-11-05).
+- Dependabot groups the Python updates into one pull request, so pydantic and pydantic-core are updated together.
+- The Docker Hub overview step of the release workflow uses peter-evans/dockerhub-description v5.
+
 ## 0.3.1 (2026-11-06)
 
 ### Changed

@@ -212,3 +212,23 @@ if ("IntersectionObserver" in window && window.htmx) {
   window.addEventListener("load", go);  // again once images have set the page's height
   window.setTimeout(go, 300);           // and once more after the first paint, in case the browser restored a scroll position meanwhile
 })();
+
+// The footer stays at the bottom of the window like the header stays at the top. Away from the end of the page it is a single slim row;
+// at the very bottom it is the full footer. The two thresholds differ so the change in height cannot flip it back and forth.
+(function () {
+  var f = document.querySelector("body > footer.foot");
+  if (!f) { return; }
+  var queued = false;
+  function sync() {
+    queued = false;
+    var d = document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
+    var full = !f.classList.contains("compact");
+    if (full && d > 200) { f.classList.add("compact"); }
+    else if (!full && d < 60) { f.classList.remove("compact"); }
+  }
+  function queue() { if (!queued) { queued = true; window.requestAnimationFrame(sync); } }
+  window.addEventListener("scroll", queue, { passive: true });
+  window.addEventListener("resize", queue);
+  document.body.addEventListener("htmx:afterSwap", queue);
+  sync();
+})();

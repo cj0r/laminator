@@ -28,7 +28,7 @@
 {% endif %}
 {% if copy_rows %}
 <section class="card2 copiespanel" id="copies">
-  <div class="hrow subhead first"><h3 class="sub">Copies of this title ({{ copy_rows | length }})</h3>{% call info("i-copies") %}This title is in {{ lib }} more than once, for example as an HD and a UHD copy. Each copy is a separate item on {{ srv_label }} with its own poster, so each can have its own custom poster and its own state: nothing is merged. The Library shows the copies together unless you choose <em>Each copy</em>. Open a copy to work on it alone, or apply to all of them at once.{% endcall %}</div>
+  <div class="hrow subhead first"><h3 class="sub">Copies of this title ({{ copy_rows | length }})</h3>{% call info("i-copies") %}This title is in {{ lib }} more than once, for example as an HD and a UHD copy. Each copy is a separate item on {{ srv_label }} with its own poster, so each can have its own custom poster and its own state: nothing is merged. The Library shows the copies together unless you choose <em>Unstacked</em>. Open a copy to work on it alone, or apply to all of them at once.{% endcall %}</div>
   {% for r in copy_rows %}<div class="copyrow {{ 'current' if r.current }}">
     <img loading="lazy" decoding="async" width="300" height="450" src="/img/{{ r.it.id }}/thumb?s={{ srv }}&v={{ r.it.poster_tag or 'none' }}" alt="">
     <span class="cname"><strong>{{ r.label }}</strong></span>

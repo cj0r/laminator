@@ -17,6 +17,10 @@ Font License, Version 1.1, whose text follows this list. The fonts are not sold 
 | Outfit | Copyright 2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts) |
 | Poppins | Copyright 2020 The Poppins Project Authors (https://github.com/itfoundry/Poppins) |
 
+## htmx (bundled, Zero-Clause BSD)
+
+`src/laminator/web/static/htmx.min.js` is [htmx](https://htmx.org) 2.0.11, used unmodified and licensed under the Zero-Clause BSD license.
+
 ## Python dependencies (installed, not copied into this repository)
 
 The Docker image installs the pinned packages in `requirements.txt`. Their licenses, from each package's own metadata:

@@ -36,7 +36,7 @@ laminator changes posters and metadata on your media server: try it on a few tit
 ## Tags
 
 - `latest`: the newest release.
-- `0`, `0.3`, `0.3.1`: a major, minor or exact release, to update on your own terms.
+- `0`, `0.3`, `0.3.2`: a major, minor or exact release, to update on your own terms.
 
 The same images are on GitHub's registry as `ghcr.io/cj0r/laminator`.
 
